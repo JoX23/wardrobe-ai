@@ -14,14 +14,21 @@ def agregar(texto):
 
 def listar():
     """Muestra todas las tareas numeradas, marcando las completadas."""
-    # TODO: imprimir cada tarea con su número (empezando en 1) y [x] si está hecha
-    raise NotImplementedError
+    if not TAREAS:
+        print("(sin tareas)")
+        return
+    for i, tarea in enumerate(TAREAS, start=1):
+        marca = "[x]" if tarea["hecha"] else "[ ]"
+        print(f"{i}. {marca} {tarea['texto']}")
 
 
 def completar(indice):
     """Marca como hecha la tarea con el número dado (empezando en 1)."""
-    # TODO: validar el índice y marcar la tarea como hecha
-    raise NotImplementedError
+    if not 1 <= indice <= len(TAREAS):
+        print(f"índice inválido: {indice}")
+        return
+    TAREAS[indice - 1]["hecha"] = True
+    print(f"Completada: {TAREAS[indice - 1]['texto']}")
 
 
 def main(argv):

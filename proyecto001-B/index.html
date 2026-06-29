@@ -296,34 +296,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
     </div>
     <div class="camera-btns">
       <button class="btn-primary" id="captureBtn" onclick="capture()">📸 Tomar foto</button>
-      <button class="btn-secondary" onclick="openCamera()">📷 Abrir cámara</button>
       <button class="btn-secondary" onclick="uploadFile()">🖼 Subir foto</button>
     </div>
     <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile(this)">
-    <div class="form-group">
-      <label>Categoría</label>
-      <select id="itemCategory">
-        <option value="top">Parte de arriba</option>
-        <option value="bottom">Parte de abajo</option>
-        <option value="dress">Vestido / Enterizo</option>
-        <option value="shoe">Zapatos</option>
-        <option value="accessory">Accesorio</option>
-        <option value="outer">Abrigo / Chaqueta</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Nombre (opcional)</label>
-      <input id="itemName" placeholder="ej: Blusa azul floral" maxlength="30">
-    </div>
-    <div class="form-group">
-      <label>Color principal</label>
-      <div class="tag-grid" id="colorTags"></div>
-    </div>
-    <div class="form-group">
-      <label>Estilo</label>
-      <div class="tag-grid" id="styleTags"></div>
-    </div>
-    <button class="btn-primary" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600" onclick="saveItem()">💾 Guardar prenda</button>
+    <div id="autoStatus" style="text-align:center;font-size:13px;color:#888;margin:8px 0;min-height:20px"></div>
   </div>
 
   <!-- PROFILE -->
@@ -445,7 +421,6 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
 <script>
 // ─── DATA ───
 const COLORS = ['#e74c3c Rojo','#e67e22 Naranja','#f1c40f Amarillo','#2ecc71 Verde','#3498db Azul','#9b59b6 Púrpura','#1a1a2e Negro','#f5f5f5 Blanco','#d4a574 Beige','#95a5a6 Gris','#e84393 Rosa','#6c5b7b Lila'];
-const STYLES = ['Casual','Elegante','Deportivo','Bohemio','Minimalista','Romántico','Urbano','Vintage','Playero','Formal'];
 const BODY_TYPES = [
   {id:'hourglass',name:'Reloj de arena',icon:'⏳',desc:'Hombros y cadera del mismo ancho, cintura marcada'},
   {id:'pear',name:'Pera',icon:'🍐',desc:'Cadera más ancha que hombros'},
@@ -806,6 +781,8 @@ function deleteItem(id) {
 
 // ─── CAMERA ───
 let stream = null;
+let lastDetectedCategory = 'top';
+let lastDetectedColor = '#888';
 
 function openCamera() {
   const video = document.getElementById('video');
@@ -871,7 +848,7 @@ function handleFile(input) {
     placeholder.innerHTML = `<img src="${state.lastImg}" style="width:100%;height:100%;object-fit:cover">`;
     placeholder.style.display = 'block';
     document.getElementById('video').style.display = 'none';
-    analyzeImage(state.lastImg);
+    analyzeImage(state.lastImg, autoSaveItem);
   };
   reader.readAsDataURL(file);
 }
@@ -896,15 +873,8 @@ function analyzeImage(imgData, onDone) {
 
   const img = new Image();
   img.onload = () => {
-    // 1. Extract dominant color
-    const color = extractDominantColor(img);
-    if (color) {
-      document.querySelectorAll('#colorTags button').forEach(b => {
-        b.classList.toggle('active', b.dataset.color === color);
-      });
-    }
+    lastDetectedColor = extractDominantColor(img) || '#888';
 
-    // 2. Try MobileNet classification
     if (mobilenetModel) {
       classifyWithMobileNet(img, () => { showAnalyzing(false); if (onDone) onDone(); });
     } else if (!modelLoading) {
@@ -912,7 +882,6 @@ function analyzeImage(imgData, onDone) {
       showAnalyzing(false);
       if (onDone) onDone();
     } else {
-      // Wait for model
       setTimeout(() => {
         if (mobilenetModel) classifyWithMobileNet(img, () => { showAnalyzing(false); if (onDone) onDone(); });
         else { heuristicClassify(img); showAnalyzing(false); if (onDone) onDone(); }
@@ -923,16 +892,19 @@ function analyzeImage(imgData, onDone) {
 }
 
 function showAnalyzing(on) {
-  const btn = document.getElementById('captureBtn');
+  const el = document.getElementById('autoStatus');
   if (on) {
-    btn.textContent = '⏳ Analizando...';
-    btn.disabled = true;
-    btn.style.opacity = '.6';
+    el.textContent = '⏳ Analizando prenda...';
   } else {
-    btn.textContent = '📸 Tomar foto';
-    btn.disabled = false;
-    btn.style.opacity = '1';
+    el.textContent = '';
   }
+}
+
+const CAT_NAMES = { top:'Parte de arriba', bottom:'Parte de abajo', dress:'Vestido', shoe:'Zapato', accessory:'Accesorio', outer:'Abrigo' };
+
+function setAutoStatus(cat) {
+  const el = document.getElementById('autoStatus');
+  el.innerHTML = `✅ Detectado: <strong>${CAT_NAMES[cat] || cat}</strong>`;
 }
 
 function extractDominantColor(img) {
@@ -991,9 +963,8 @@ async function classifyWithMobileNet(img, onDone) {
 
       const cat = mapLabelToCategory(label);
       if (cat) {
-        document.getElementById('itemCategory').value = cat;
-        document.getElementById('itemCategory').style.borderColor = '#2ecc71';
-        setTimeout(() => document.getElementById('itemCategory').style.borderColor = '', 2000);
+        lastDetectedCategory = cat;
+        setAutoStatus(cat);
       }
     }
     if (onDone) onDone();
@@ -1035,9 +1006,8 @@ function heuristicClassify(img) {
   else if (diff > 60) suggestion = 'top'; // two pieces likely
   else if (ratio < 0.8) suggestion = 'accessory';
 
-  document.getElementById('itemCategory').value = suggestion;
-  document.getElementById('itemCategory').style.borderColor = '#2ecc71';
-  setTimeout(() => document.getElementById('itemCategory').style.borderColor = '', 2000);
+  lastDetectedCategory = suggestion;
+  setAutoStatus(suggestion);
 }
 
 function mapLabelToCategory(label) {
@@ -1057,70 +1027,8 @@ function mapLabelToCategory(label) {
   return null;
 }
 
-// ─── TAGS ───
-function initTags() {
-  const colorEl = document.getElementById('colorTags');
-  colorEl.innerHTML = COLORS.map(c => {
-    const [hex, name] = c.split(' ');
-    return `<button data-color="${hex}" style="border-left:3px solid ${hex}">${name}</button>`;
-  }).join('');
-  colorEl.querySelectorAll('button').forEach(b => {
-    b.addEventListener('click', () => {
-      colorEl.querySelectorAll('button').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-    });
-  });
-
-  const styleEl = document.getElementById('styleTags');
-  styleEl.innerHTML = STYLES.map(s => `<button data-style="${s}">${s}</button>`).join('');
-  styleEl.querySelectorAll('button').forEach(b => {
-    b.addEventListener('click', () => {
-      b.classList.toggle('active');
-    });
-  });
-}
-initTags();
-
-// ─── SAVE ITEM ───
-function saveItem() {
-  if (!state.lastImg) { alert('Toma o sube una foto primero'); return; }
-  const cat = document.getElementById('itemCategory').value;
-  const name = document.getElementById('itemName').value.trim() || 'Prenda';
-  const colorEl = document.querySelector('#colorTags .active');
-  const color = colorEl ? colorEl.dataset.color : '#888';
-  const styles = Array.from(document.querySelectorAll('#styleTags .active')).map(b => b.dataset.style);
-
-  const item = {
-    id: Date.now().toString(36) + Math.random().toString(36).slice(2,5),
-    img: state.lastImg,
-    category: cat,
-    name,
-    color,
-    styles,
-    added: new Date().toISOString(),
-  };
-
-  state.items.push(item);
-  state.lastImg = null;
-  saveState();
-
-  // Reset form
-  document.getElementById('itemName').value = '';
-  document.querySelectorAll('#colorTags .active').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('#styleTags .active').forEach(b => b.classList.remove('active'));
-  document.getElementById('camPlaceholder').innerHTML = `
-    <span class="cam-icon">📷</span>
-    <span style="font-size:13px">Toma una foto de tu prenda</span>`;
-
-  alert('✅ Prenda guardada');
-  document.querySelector('[data-tab="closet"]').click();
-  renderCloset('all');
-}
-
 function autoSaveItem() {
-  const cat = document.getElementById('itemCategory').value;
-  const colorEl = document.querySelector('#colorTags .active');
-  const color = colorEl ? colorEl.dataset.color : '#888';
+  const cat = lastDetectedCategory;
 
   const catNames = { top:'Top', bottom:'Pantalón/Falda', dress:'Vestido', shoe:'Zapato', accessory:'Accesorio', outer:'Abrigo' };
   const name = catNames[cat] || 'Prenda';
@@ -1130,7 +1038,7 @@ function autoSaveItem() {
     img: state.lastImg,
     category: cat,
     name,
-    color,
+    color: lastDetectedColor,
     styles: [],
     added: new Date().toISOString(),
   };
@@ -1139,13 +1047,10 @@ function autoSaveItem() {
   state.lastImg = null;
   saveState();
 
-  // Reset form
-  document.getElementById('itemName').value = '';
-  document.querySelectorAll('#colorTags .active').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('#styleTags .active').forEach(b => b.classList.remove('active'));
   document.getElementById('camPlaceholder').innerHTML = `
     <span class="cam-icon">📷</span>
     <span style="font-size:13px">Toma una foto de tu prenda</span>`;
+  document.getElementById('autoStatus').textContent = '';
 
   toast('✅ ' + name + ' guardada');
   document.querySelector('[data-tab="closet"]').click();

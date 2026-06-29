@@ -276,9 +276,9 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
         <div class="so-icon">📷</div>
         <div class="so-text">Código QR<small>Escanea desde otro dispositivo</small></div>
       </div>
-      <div class="share-option" id="installOption" onclick="installApp()" style="display:none">
-        <div class="so-icon">📲</div>
-        <div class="so-text">Instalar app<small>Agrega a tu pantalla de inicio</small></div>
+      <div class="share-option" id="installOption" onclick="installApp()">
+        <div class="so-icon" id="installIcon">📲</div>
+        <div class="so-text" id="installText">Instalar app<small id="installSub">Agrega a tu pantalla de inicio</small></div>
       </div>
       <button class="share-close" onclick="closeShare()">Cerrar</button>
     </div>
@@ -1673,8 +1673,8 @@ let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   deferredPrompt = e;
-  const btn = document.getElementById('installOption');
-  if (btn) btn.style.display = 'flex';
+  document.getElementById('installIcon').textContent = '📲';
+  document.getElementById('installText').innerHTML = 'Instalar app<small>Agrega a tu pantalla de inicio</small>';
   showInstallBanner();
 });
 
@@ -1684,16 +1684,20 @@ function showInstallBanner() {
   if (window.matchMedia('(display-mode: standalone)').matches) return;
   if (window.navigator.standalone) return;
   if (localStorage.getItem('installBannerDismissed')) return;
-  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-    banner.querySelector('.ib-btn').textContent = 'Ver cómo';
-  }
   banner.style.display = 'flex';
 }
 
 function installApp() {
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.navigator.standalone) {
     document.getElementById('installBanner').style.display = 'none';
-    alert('En iOS: abre el menú Compartir (icono 📤) y selecciona "Agregar a la pantalla de inicio"');
+    if (navigator.share) {
+      navigator.share({
+        title:'Wardrobe AI',
+        text:'Agrega esta app a tu pantalla de inicio desde el menú Compartir de Safari'
+      }).catch(() => {});
+    } else {
+      toast('En iOS: abre Safari, toca el icono 📤 y selecciona "Agregar a pantalla de inicio"');
+    }
     return;
   }
   if (!deferredPrompt) {
@@ -1711,9 +1715,15 @@ document.getElementById('installBanner')?.querySelector('.ib-close')?.addEventLi
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-// Show banner for iOS (beforeinstallprompt doesn't fire on iOS)
-if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.navigator.standalone) {
-  setTimeout(showInstallBanner, 2000);
+// On iOS, show install option and banner
+if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+  document.getElementById('installIcon').textContent = '🍎';
+  document.getElementById('installText').innerHTML = 'Instalar en iOS<small>Agrega a pantalla de inicio desde Safari</small>';
+  setTimeout(showInstallBanner, 1000);
+}
+// On desktop without beforeinstallprompt, show banner too
+if (!/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches) {
+  setTimeout(showInstallBanner, 3000);
 }
 </script>
 </body>

@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Wardrobe AI — Tu clóset inteligente</title>
+<meta name="description" content="Wardrobe.ai: organiza tu clóset, descubre tu tipo de cuerpo y tono de piel, recibe outfits recomendados con IA para cada ocasión. App de moda personal gratis.">
+<meta name="keywords" content="moda, clóset virtual, outfit, recomendaciones, tipo de cuerpo, color de piel, temporada de color, armario, fashion, wardrobe">
+<meta property="og:title" content="Wardrobe AI — Tu clóset inteligente">
+<meta property="og:description" content="Organiza tu ropa, descubre qué te favorece y recibe outfits para cada ocasión.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Wardrobe AI — Tu clóset inteligente">
+<meta name="twitter:description" content="Organiza tu ropa, descubre qué te favorece y recibe outfits para cada ocasión.">
+<link rel="canonical" href="https://jox23.github.io/wardrobe-ai/">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#f8f6f4; color:#222; overflow:hidden; height:100vh; }
+
+/* ─── LAYOUT ─── */
+.app { display:flex; flex-direction:column; height:100vh; }
+
+/* ─── TOP BAR ─── */
+.top { display:flex; align-items:center; padding:12px 16px; background:#fff;
+  border-bottom:1px solid #eee; flex-shrink:0; z-index:10; }
+.top h1 { font-size:18px; font-weight:700; background:linear-gradient(135deg,#e94560,#7c4dff);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.top .spacer { flex:1; }
+.top button { background:transparent; border:none; font-size:20px; cursor:pointer; padding:4px 8px; border-radius:8px; }
+.top button:hover { background:#f0f0f0; }
+
+/* ─── TABS ─── */
+.tabs { display:flex; background:#fff; border-bottom:1px solid #eee; flex-shrink:0; }
+.tabs button { flex:1; padding:10px; border:none; background:transparent;
+  font-size:12px; font-weight:500; color:#888; cursor:pointer; border-bottom:2px solid transparent; transition:.15s; }
+.tabs button.active { color:#e94560; border-bottom-color:#e94560; }
+.tabs button .tab-icon { font-size:18px; display:block; margin-bottom:2px; }
+
+/* ─── PAGES ─── */
+.page { flex:1; overflow-y:auto; display:none; padding:16px; }
+.page.active { display:block; }
+.page::-webkit-scrollbar { width:4px; }
+.page::-webkit-scrollbar-thumb { background:#ddd; border-radius:3px; }
+
+/* ─── CARDS ─── */
+.card { background:#fff; border-radius:12px; padding:16px; margin-bottom:12px;
+  box-shadow:0 2px 8px rgba(0,0,0,.06); }
+
+/* ─── HOME ─── */
+.hero { text-align:center; padding:24px 0 16px; }
+.hero .greeting { font-size:22px; font-weight:700; margin-bottom:4px; }
+.hero .sub { color:#888; font-size:14px; }
+
+.outfit-card { background:linear-gradient(135deg,#faf0ff,#fff0f3); border-radius:16px;
+  padding:20px; text-align:center; margin:12px 0; }
+.outfit-card .big-icon { font-size:48px; margin-bottom:8px; }
+.outfit-card .title { font-size:16px; font-weight:600; margin-bottom:4px; }
+.outfit-card .desc { font-size:13px; color:#666; line-height:1.5; }
+
+.outfit-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:8px; margin:12px 0; }
+.outfit-item { background:#fff; border-radius:10px; padding:10px; text-align:center;
+  border:1px solid #eee; }
+.outfit-item .preview { width:100%; height:80px; background:#f5f5f5; border-radius:8px;
+  display:flex; align-items:center; justify-content:center; font-size:32px; margin-bottom:6px; }
+.outfit-item .name { font-size:12px; color:#444; }
+.outfit-item .reason { font-size:10px; color:#999; margin-top:2px; }
+
+/* ─── PROFILE SETUP ─── */
+.profile-section { margin-bottom:16px; }
+.profile-section label { font-size:12px; font-weight:600; color:#666; display:block; margin-bottom:8px; }
+.option-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(90px,1fr)); gap:6px; }
+.option-grid button { padding:8px; background:#f5f5f5; border:2px solid transparent;
+  border-radius:10px; cursor:pointer; font-size:11px; text-align:center; transition:.15s; }
+.option-grid button:hover { border-color:#ddd; }
+.option-grid button.active { border-color:#e94560; background:#fff0f3; }
+.option-grid button .opt-icon { font-size:20px; display:block; margin-bottom:4px; }
+
+/* ─── CLOSET ─── */
+.closet-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.closet-item { position:relative; background:#fff; border-radius:10px; overflow:hidden;
+  border:1px solid #eee; aspect-ratio:3/4; display:flex; flex-direction:column; }
+.closet-item img { width:100%; height:75%; object-fit:cover; background:#f5f5f5; }
+.closet-item .info { padding:5px 8px; flex:1; display:flex; align-items:center; justify-content:space-between; }
+.closet-item .info .tag { font-size:10px; color:#888; }
+.closet-item .info .cat { font-size:9px; color:#fff; background:#e94560; padding:1px 6px; border-radius:4px; }
+.closet-item .del-btn { position:absolute; top:4px; right:4px; width:22px; height:22px;
+  background:rgba(233,69,96,.85); color:#fff; border:none; border-radius:50%; font-size:12px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; }
+
+/* ─── ADD ITEM ─── */
+.camera-box { width:100%; aspect-ratio:3/4; background:#eee; border-radius:12px;
+  overflow:hidden; display:flex; align-items:center; justify-content:center;
+  position:relative; margin-bottom:12px; }
+.camera-box video, .camera-box img { width:100%; height:100%; object-fit:cover; }
+.camera-box .placeholder { text-align:center; color:#aaa; }
+.camera-box .placeholder .cam-icon { font-size:40px; display:block; margin-bottom:8px; }
+.camera-btns { display:flex; gap:8px; margin-bottom:12px; }
+.camera-btns button { flex:1; padding:10px; border:none; border-radius:10px;
+  font-size:13px; font-weight:600; cursor:pointer; transition:.1s; }
+.camera-btns button:active { transform:scale(.97); }
+.btn-primary { background:#e94560; color:#fff; }
+.btn-secondary { background:#f0f0f0; color:#444; }
+.btn-primary:hover { background:#d63850; }
+.btn-secondary:hover { background:#e4e4e4; }
+
+.form-group { margin-bottom:10px; }
+.form-group label { font-size:12px; font-weight:600; color:#666; display:block; margin-bottom:4px; }
+.form-group select, .form-group input { width:100%; padding:8px 10px; border:1px solid #ddd;
+  border-radius:8px; font-size:13px; background:#fff; }
+.form-group select:focus, .form-group input:focus { outline:none; border-color:#e94560; }
+
+.tag-grid { display:flex; flex-wrap:wrap; gap:4px; }
+.tag-grid button { padding:4px 10px; background:#f5f5f5; border:1px solid #eee;
+  border-radius:15px; font-size:11px; cursor:pointer; transition:.1s; }
+.tag-grid button:hover { background:#eee; }
+.tag-grid button.active { background:#e94560; color:#fff; border-color:#e94560; }
+
+/* ─── EMPTY STATE ─── */
+.empty { text-align:center; padding:40px 20px; color:#aaa; }
+.empty .e-icon { font-size:48px; margin-bottom:12px; }
+.empty p { font-size:14px; }
+
+/* ─── RECOMMENDATION ─── */
+.rec-card { background:#fff; border-radius:12px; padding:16px; margin-bottom:10px;
+  border:1px solid #eee; }
+.rec-card .rec-title { font-size:13px; font-weight:600; color:#e94560; margin-bottom:4px; }
+.rec-card .rec-desc { font-size:12px; color:#666; line-height:1.5; }
+.rec-card .rec-tags { display:flex; gap:4px; margin-top:6px; flex-wrap:wrap; }
+.rec-card .rec-tags span { padding:2px 8px; background:#f5f5f5; border-radius:10px; font-size:10px; color:#888; }
+
+/* ─── QUIZ ─── */
+.quiz-q { margin:8px 0; }
+.quiz-q .option-grid { grid-template-columns:repeat(2,1fr) !important; }
+.quiz-q .option-grid button { padding:10px 8px; font-size:12px; }
+.quiz-q .option-grid button:active { transform:scale(.97); }
+
+  ─── LOGIN ─── */
+.login-overlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100;
+  display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+.login-box { background:#fff; border-radius:20px; padding:28px; width:320px;
+  max-width:90vw; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+.login-box h2 { font-size:20px; margin-bottom:4px; background:linear-gradient(135deg,#e94560,#7c4dff);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.login-box .sub { font-size:13px; color:#888; margin-bottom:16px; }
+.login-box input { width:100%; padding:10px 14px; border:1px solid #ddd; border-radius:10px;
+  font-size:14px; margin-bottom:10px; outline:none; }
+.login-box input:focus { border-color:#e94560; }
+.login-box .users-list { max-height:180px; overflow-y:auto; margin:8px 0; }
+.login-box .users-list button { width:100%; padding:10px; background:#f5f5f5; border:1px solid #eee;
+  border-radius:8px; font-size:14px; cursor:pointer; margin-bottom:4px; transition:.1s; }
+.login-box .users-list button:hover { background:#eee; border-color:#e94560; }
+.login-box .btn-login { width:100%; padding:10px; background:#e94560; color:#fff;
+  border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; }
+.login-box .btn-login:hover { background:#d63850; }
+.login-box .btn-login:active { transform:scale(.97); }
+.login-box .or { font-size:12px; color:#bbb; margin:8px 0; position:relative; }
+.login-box .or::before,.login-box .or::after { content:''; position:absolute; top:50%; width:40%; height:1px; background:#eee; }
+.login-box .or::before { left:0; } .login-box .or::after { right:0; }
+
+.user-badge { display:flex; align-items:center; gap:6px; padding:4px 10px; background:var(--bg3);
+  border-radius:20px; cursor:pointer; font-size:12px; color:var(--text2); border:1px solid var(--border); }
+.user-badge:hover { border-color:var(--accent); }
+.user-badge .avatar { width:22px; height:22px; border-radius:50%; background:var(--accent);
+  display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:600; }
+
+/* ─── SHARE ─── */
+.share-modal { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:99;
+  display:none; align-items:center; justify-content:center; backdrop-filter:blur(3px); }
+.share-box { background:#fff; border-radius:16px; padding:24px; width:340px; max-width:90vw;
+  text-align:center; box-shadow:0 16px 48px rgba(0,0,0,.2); }
+.share-box h3 { font-size:17px; margin-bottom:4px; color:#222; }
+.share-box .sub2 { font-size:13px; color:#888; margin-bottom:16px; }
+.share-option { display:flex; align-items:center; gap:12px; padding:12px;
+  background:#f5f5f5; border-radius:10px; margin-bottom:8px; cursor:pointer; transition:.1s;
+  border:1px solid transparent; text-align:left; }
+.share-option:hover { border-color:#e94560; background:#fff0f3; }
+.share-option .so-icon { font-size:24px; width:40px; text-align:center; }
+.share-option .so-text { font-size:13px; color:#444; }
+.share-option .so-text small { display:block; font-size:11px; color:#999; }
+.share-close { margin-top:8px; padding:8px 20px; background:transparent; border:1px solid #ddd;
+  border-radius:8px; font-size:13px; color:#666; cursor:pointer; }
+.share-close:hover { background:#f5f5f5; }
+.share-toast { position:fixed; bottom:30px; left:50%; transform:translateX(-50%);
+  background:#222; color:#fff; padding:10px 20px; border-radius:10px; font-size:13px;
+  z-index:200; opacity:0; transition:opacity .3s; pointer-events:none; }
+.share-toast.show { opacity:1; }
+
+@media (max-width:480px) {
+  .closet-grid { grid-template-columns:repeat(2,1fr); }
+  .option-grid { grid-template-columns:repeat(3,1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SHARE MODAL -->
+  <div class="share-modal" id="shareModal">
+    <div class="share-box">
+      <h3>📤 Compartir app</h3>
+      <div class="sub2">Comparte Wardrobe.ai con tus amigos</div>
+      <div class="share-option" onclick="shareNative()">
+        <div class="so-icon">📱</div>
+        <div class="so-text">Compartir nativo<small>Usa las opciones de tu dispositivo</small></div>
+      </div>
+      <div class="share-option" onclick="shareCopyLink()">
+        <div class="so-icon">🔗</div>
+        <div class="so-text">Copiar enlace<small>Copia la URL de la app</small></div>
+      </div>
+      <div class="share-option" onclick="downloadApp()">
+        <div class="so-icon">📦</div>
+        <div class="so-text">Descargar HTML<small>Guarda la app para compartir</small></div>
+      </div>
+      <div class="share-option" onclick="showQR()">
+        <div class="so-icon">📷</div>
+        <div class="so-text">Código QR<small>Escanea desde otro dispositivo</small></div>
+      </div>
+      <button class="share-close" onclick="closeShare()">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="share-toast" id="shareToast"></div>
+
+  <!-- LOGIN OVERLAY -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+      <h2>wardrobe.ai</h2>
+      <div class="sub">Tu clóset personal inteligente</div>
+      <div id="loginContent"></div>
+    </div>
+  </div>
+
+  <div class="top">
+    <h1>wardrobe.ai</h1>
+    <div class="spacer"></div>
+    <div class="user-badge" id="userBadge" onclick="showLogin()">
+      <span class="avatar" id="userAvatar">?</span>
+      <span id="userName">Invitado</span>
+    </div>
+    <button onclick="exportData()" title="Guardar datos">💾</button>
+    <button onclick="showShare()" title="Compartir app">📤</button>
+  </div>
+
+  <div class="tabs">
+    <button class="active" data-tab="home"><span class="tab-icon">🏠</span>Hoy</button>
+    <button data-tab="closet"><span class="tab-icon">👗</span>Clóset</button>
+    <button data-tab="add"><span class="tab-icon">📸</span>Agregar</button>
+    <button data-tab="discover"><span class="tab-icon">🔍</span>Descubrir</button>
+    <button data-tab="profile"><span class="tab-icon">👤</span>Perfil</button>
+  </div>
+
+  <!-- HOME -->
+  <div class="page active" id="page-home">
+    <div class="hero">
+      <div class="greeting" id="greeting">¡Buenos días!</div>
+      <div class="sub" id="todayDate"></div>
+    </div>
+    <div id="homeContent"></div>
+  </div>
+
+  <!-- CLOSET -->
+  <div class="page" id="page-closet">
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button class="btn-secondary" style="flex:1" onclick="filterCloset('all')">Todas</button>
+      <button class="btn-secondary" style="flex:1" onclick="filterCloset('top')">Parte arriba</button>
+      <button class="btn-secondary" style="flex:1" onclick="filterCloset('bottom')">Parte abajo</button>
+      <button class="btn-secondary" style="flex:1" onclick="filterCloset('dress')">Vestidos</button>
+      <button class="btn-secondary" style="flex:1" onclick="filterCloset('shoe')">Zapatos</button>
+      <button class="btn-secondary" style="flex:1" onclick="filterCloset('accessory')">Accesorios</button>
+    </div>
+    <div class="closet-grid" id="closetGrid"></div>
+  </div>
+
+  <!-- ADD -->
+  <div class="page" id="page-add">
+    <div class="camera-box" id="cameraBox">
+      <video id="video" autoplay playsinline style="display:none"></video>
+      <canvas id="photoCanvas" style="display:none"></canvas>
+      <div class="placeholder" id="camPlaceholder">
+        <span class="cam-icon">📷</span>
+        <span style="font-size:13px">Toma una foto de tu prenda</span>
+      </div>
+    </div>
+    <div class="camera-btns">
+      <button class="btn-primary" id="captureBtn" onclick="capture()">📸 Tomar foto</button>
+      <button class="btn-secondary" onclick="openCamera()">📷 Abrir cámara</button>
+      <button class="btn-secondary" onclick="uploadFile()">🖼 Subir foto</button>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile(this)">
+    <div class="form-group">
+      <label>Categoría</label>
+      <select id="itemCategory">
+        <option value="top">Parte de arriba</option>
+        <option value="bottom">Parte de abajo</option>
+        <option value="dress">Vestido / Enterizo</option>
+        <option value="shoe">Zapatos</option>
+        <option value="accessory">Accesorio</option>
+        <option value="outer">Abrigo / Chaqueta</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Nombre (opcional)</label>
+      <input id="itemName" placeholder="ej: Blusa azul floral" maxlength="30">
+    </div>
+    <div class="form-group">
+      <label>Color principal</label>
+      <div class="tag-grid" id="colorTags"></div>
+    </div>
+    <div class="form-group">
+      <label>Estilo</label>
+      <div class="tag-grid" id="styleTags"></div>
+    </div>
+    <button class="btn-primary" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600" onclick="saveItem()">💾 Guardar prenda</button>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="page" id="page-discover">
+    <div class="card">
+      <div style="font-size:16px;font-weight:600;margin-bottom:4px">🔍 Descubre tu tipo de cuerpo</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px">Responde estas preguntas para identificar tu silueta</div>
+      <div id="bodyQuiz">
+        <div class="quiz-q" id="bq1">
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px">1. ¿Cómo son tus hombros comparados con tus caderas?</div>
+          <div class="option-grid" style="grid-template-columns:repeat(2,1fr)">
+            <button onclick="answerBody(1,'shoulders-wide')"><span class="opt-icon">🏋️</span>Más anchos que caderas</button>
+            <button onclick="answerBody(1,'shoulders-equal')"><span class="opt-icon">↔️</span>Igual que caderas</button>
+            <button onclick="answerBody(1,'shoulders-narrow')"><span class="opt-icon">🔽</span>Más angostos que caderas</button>
+          </div>
+        </div>
+        <div class="quiz-q" id="bq2" style="display:none">
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px">2. ¿Cómo describes tu cintura?</div>
+          <div class="option-grid" style="grid-template-columns:repeat(2,1fr)">
+            <button onclick="answerBody(2,'waist-defined')"><span class="opt-icon">⌛</span>Bien marcada (más angosta)</button>
+            <button onclick="answerBody(2,'waist-straight')"><span class="opt-icon">▬</span>Recta, poco marcada</button>
+            <button onclick="answerBody(2,'waist-fuller')"><span class="opt-icon">🟤</span>Más llena / poco definida</button>
+          </div>
+        </div>
+        <div class="quiz-q" id="bq3" style="display:none">
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px">3. ¿Dónde tiendes a acumular peso primero?</div>
+          <div class="option-grid" style="grid-template-columns:repeat(2,1fr)">
+            <button onclick="answerBody(3,'weight-belly')"><span class="opt-icon">🍎</span>Vientre / abdomen</button>
+            <button onclick="answerBody(3,'weight-hips')"><span class="opt-icon">🍐</span>Cadera / muslos</button>
+            <button onclick="answerBody(3,'weight-even')"><span class="opt-icon">⚖️</span>Se distribuye parejo</button>
+          </div>
+        </div>
+        <div id="bodyResult" style="display:none;text-align:center;padding:16px">
+          <div style="font-size:36px;margin-bottom:8px" id="bodyResultIcon"></div>
+          <div style="font-size:18px;font-weight:600;margin-bottom:4px" id="bodyResultTitle"></div>
+          <div style="font-size:13px;color:#666;margin-bottom:12px;line-height:1.5" id="bodyResultDesc"></div>
+          <button class="btn-primary" style="padding:8px 20px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer" onclick="applyBodyResult()">✅ Usar este tipo de cuerpo</button>
+          <button class="btn-secondary" style="padding:8px 20px;border:none;border-radius:8px;font-size:13px;cursor:pointer;margin-left:6px" onclick="resetBodyQuiz()">🔄 Rehacer</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:16px;font-weight:600;margin-bottom:4px">🎨 Descubre tu tono de piel</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px">Pruebas simples para encontrar tu temporada de color</div>
+      <div id="skinQuiz">
+        <div class="quiz-q" id="sq1">
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px">1. Prueba de las venas: mira tus muñecas. ¿De qué color se ven tus venas?</div>
+          <div class="option-grid" style="grid-template-columns:repeat(2,1fr)">
+            <button onclick="answerSkin(1,'veins-blue')"><span class="opt-icon">🔵</span>Azuladas / moradas</button>
+            <button onclick="answerSkin(1,'veins-green')"><span class="opt-icon">🟢</span>Verdeazuladas / verdes</button>
+            <button onclick="answerSkin(1,'veins-mix')"><span class="opt-icon">🔮</span>No sé, veo ambas</button>
+          </div>
+        </div>
+        <div class="quiz-q" id="sq2" style="display:none">
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px">2. Prueba del sol: ¿cómo reacciona tu piel al sol?</div>
+          <div class="option-grid" style="grid-template-columns:repeat(2,1fr)">
+            <button onclick="answerSkin(2,'sun-burn')"><span class="opt-icon">🔥</span>Me quemo fácil, casi no me bronceo</button>
+            <button onclick="answerSkin(2,'sun-tan')"><span class="opt-icon">🏖️</span>Me bronceo fácil, poco me quemo</button>
+            <button onclick="answerSkin(2,'sun-mix')"><span class="opt-icon">🌤️</span>Primero me quemo, luego bronceo</button>
+          </div>
+        </div>
+        <div class="quiz-q" id="sq3" style="display:none">
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px">3. Prueba de las joyas: ¿qué metal te queda mejor?</div>
+          <div class="option-grid" style="grid-template-columns:repeat(2,1fr)">
+            <button onclick="answerSkin(3,'jewelry-silver')"><span class="opt-icon">🥈</span>Plata / oro blanco</button>
+            <button onclick="answerSkin(3,'jewelry-gold')"><span class="opt-icon">🥇</span>Oro / cobre</button>
+            <button onclick="answerSkin(3,'jewelry-both')"><span class="opt-icon">💎</span>Ambos me quedan bien</button>
+          </div>
+        </div>
+        <div class="quiz-q" id="sq4" style="display:none">
+          <div style="font-size:13px;font-weight:500;margin-bottom:8px">4. ¿Cuál es el color de tus ojos?</div>
+          <div class="option-grid" style="grid-template-columns:repeat(2,1fr)">
+            <button onclick="answerSkin(4,'eyes-dark')"><span class="opt-icon">⚫</span>Oscuros (café, negro)</button>
+            <button onclick="answerSkin(4,'eyes-light')"><span class="opt-icon">💙</span>Claros (azul, verde, gris)</button>
+            <button onclick="answerSkin(4,'eyes-hazel')"><span class="opt-icon">🟤</span>Avellana / miel</button>
+          </div>
+        </div>
+        <div id="skinResult" style="display:none;text-align:center;padding:16px">
+          <div style="font-size:36px;margin-bottom:8px" id="skinResultIcon"></div>
+          <div style="font-size:18px;font-weight:600;margin-bottom:4px" id="skinResultTitle"></div>
+          <div style="font-size:13px;color:#666;margin-bottom:12px;line-height:1.5" id="skinResultDesc"></div>
+          <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px" id="skinResultPalette"></div>
+          <button class="btn-primary" style="padding:8px 20px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer" onclick="applySkinResult()">✅ Usar este tono de piel</button>
+          <button class="btn-secondary" style="padding:8px 20px;border:none;border-radius:8px;font-size:13px;cursor:pointer;margin-left:6px" onclick="resetSkinQuiz()">🔄 Rehacer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="page" id="page-profile">
+    <div class="card">
+      <div class="profile-section">
+        <label>🔄 Tu tipo de cuerpo</label>
+        <div class="option-grid" id="bodyTypeGrid"></div>
+      </div>
+      <div class="profile-section">
+        <label>🎨 Tono de piel</label>
+        <div class="option-grid" id="skinToneGrid"></div>
+      </div>
+      <div class="profile-section">
+        <label>📏 Estatura</label>
+        <div class="option-grid" id="heightGrid"></div>
+      </div>
+      <div class="profile-section">
+        <label>👔 Estilo preferido</label>
+        <div class="option-grid" id="stylePrefGrid"></div>
+      </div>
+      <button class="btn-primary" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600;margin-top:8px" onclick="saveProfile()">💾 Guardar perfil</button>
+    </div>
+    <div class="card" id="recsCard" style="display:none">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">✨ Recomendaciones para ti</div>
+      <div id="profileRecs"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── DATA ───
+const COLORS = ['#e74c3c Rojo','#e67e22 Naranja','#f1c40f Amarillo','#2ecc71 Verde','#3498db Azul','#9b59b6 Púrpura','#1a1a2e Negro','#f5f5f5 Blanco','#d4a574 Beige','#95a5a6 Gris','#e84393 Rosa','#6c5b7b Lila'];
+const STYLES = ['Casual','Elegante','Deportivo','Bohemio','Minimalista','Romántico','Urbano','Vintage','Playero','Formal'];
+const BODY_TYPES = [
+  {id:'hourglass',name:'Reloj de arena',icon:'⏳',desc:'Hombros y cadera del mismo ancho, cintura marcada'},
+  {id:'pear',name:'Pera',icon:'🍐',desc:'Cadera más ancha que hombros'},
+  {id:'apple',name:'Manzana',icon:'🍎',desc:'Cintura poco marcada, peso en el centro'},
+  {id:'rectangle',name:'Rectángulo',icon:'▬',desc:'Hombros y cadera alineados, cintura recta'},
+  {id:'inverted',name:'Triángulo invertido',icon:'🔽',desc:'Hombros más anchos que cadera'},
+];
+const SKIN_TONES = [
+  {id:'fair-cool',name:'Claro frío',icon:'☁️',season:'invierno'},
+  {id:'fair-warm',name:'Claro cálido',icon:'🌞',season:'primavera'},
+  {id:'medium-cool',name:'Medio frío',icon:'🌙',season:'verano'},
+  {id:'medium-warm',name:'Medio cálido',icon:'🍂',season:'otoño'},
+  {id:'olive',name:'Oliva',icon:'🫒',season:'otoño'},
+  {id:'dark-cool',name:'Oscuro frío',icon:'🌌',season:'invierno'},
+  {id:'dark-warm',name:'Oscuro cálido',icon:'🌅',season:'otoño'},
+];
+const HEIGHTS = [
+  {id:'short',name:'Baja (1.50-1.60)',icon:'🙋'},
+  {id:'medium',name:'Media (1.60-1.75)',icon:'🧍'},
+  {id:'tall',name:'Alta (1.75+)',icon:'🧑'},
+];
+const STYLE_PREFS = ['Casual','Elegante','Deportivo','Bohemio','Minimalista','Romántico','Urbano','Vintage'];
+
+const OCCASIONS = [
+  {id:'casual',name:'🪴 Casual',desc:'Día normal, salir con amigos'},
+  {id:'work',name:'💼 Trabajo',desc:'Oficina, reuniones, formalidad media'},
+  {id:'formal',name:'🎩 Formal',desc:'Evento elegante, gala, cena fina'},
+  {id:'party',name:'🎉 Fiesta',desc:'Noche, baile, salir con amigos'},
+  {id:'date',name:'❤️ Cita',desc:'Romántico, especial, impresionar'},
+  {id:'beach',name:'🏖️ Playa',desc:'Verano, calor, fresco'},
+  {id:'sport',name:'🏃 Deporte',desc:'Gimnasio, ejercicio, cómodo'},
+  {id:'interview',name:'📋 Entrevista',desc:'Causar buena impresión profesional'},
+  {id:'travel',name:'✈️ Viaje',desc:'Cómodo para trasladarse'},
+];
+
+const OCCASION_RULES = {
+  casual: { tops:['Camiseta','Blusa ligera','Sudadera'], bottoms:['Jeans','Shorts','Pantalones casuales'], dresses:['Vestido casual','Vestido verano'], vibe:'Relajado y fresco, juega con colores' },
+  work: { tops:['Blusa','Camisa','Saco'], bottoms:['Pantalón formal','Falda lápiz','Vestido sastre'], dresses:['Vestido midi','Vestido camisero'], vibe:'Profesional, colores neutros y elegantes' },
+  formal: { tops:['Blusa elegante','Camisa formal','Top brillante'], bottoms:['Falda larga','Pantalón de vestir'], dresses:['Vestido de gala','Vestido largo'], vibe:'Elegancia total, telas finas y joyería' },
+  party: { tops:['Top llamativo','Brillante','Escote'], bottoms:['Falda corta','Pantalón ajustado'], dresses:['Vestido corto','Vestido brillante'], vibe:'Atrevido, colores vibrantes y accesorios' },
+  date: { tops:['Blusa romántica','Suéter suave'], bottoms:['Falda','Pantalón favorecedor'], dresses:['Vestido romántico','Vestido ajustado'], vibe:'Romántico y seguro, tus mejores colores' },
+  beach: { tops:['Bikini','Top playero','Ligero'], bottoms:['Short','Pareo','Falda playera'], dresses:['Vestido playero','Kaftán'], vibe:'Fresco y ligero, colores claros y alegres' },
+  sport: { tops:['Camiseta deportiva','Top deportivo'], bottoms:['Leggings','Shorts deportivos'], dresses:['Vestido deportivo'], vibe:'Cómodo y funcional, telas transpirables' },
+  interview: { tops:['Blusa formal','Camisa','Saco estructurado'], bottoms:['Pantalón formal','Falda midi'], dresses:['Vestido sastre','Vestido formal'], vibe:'Serio y profesional, colores de confianza' },
+  travel: { tops:['Camiseta cómoda','Sudadera ligera'], bottoms:['Jeans','Pantalón elástico'], dresses:['Vestido cómodo'], vibe:'Cómodo y práctico, capas versátiles' },
+};
+
+// ─── RECOMMENDATION RULES ───
+const BODY_RECS = {
+  hourglass:{
+    tops:['Ajustados','Escotes en V','Cinturones','Telas suaves'],
+    bottoms:['Faldas lápiz','Pantalones rectos','Cintura alta'],
+    dresses:['Vestidos ajustados','Envolventes','Cinturón marcado'],
+    avoid:['Ropa muy holgada','Sin definición de cintura'],
+    tip:'Resalta tu cintura con cinturones y prendas entalladas.'
+  },
+  pear:{
+    tops:['Escotes amplios','Hombros marcados','Colores claros arriba','Estampados'],
+    bottoms:['Colores oscuros abajo','Pantalones rectos','Faldas A-line'],
+    dresses:['Vestidos corte imperio','Escote bardot'],
+    avoid:['Bolsillos laterales','Telas gruesas en cadera'],
+    tip:'Equilibra tus proporciones: volumen arriba, liso abajo.'
+  },
+  apple:{
+    tops:['Escotes en V','Telas fluidas','Largo a la cadera','Colores oscuros'],
+    bottoms:['Pantalones rectos','Faldas midi','Cintura elástica'],
+    dresses:['Vestidos imperio','Corte en V','Línea A'],
+    avoid:['Telas rígidas','Cintura muy ajustada','Bolsas en cintura'],
+    tip:'Busca verticalidad con escotes en V y prendas fluidas.'
+  },
+  rectangle:{
+    tops:['Volúmenes','Hombros estructurados','Escotes bardot','Colores vibrantes'],
+    bottoms:['Faldas con vuelo','Pantalones acampanados','Cintura alta'],
+    dresses:['Vestidos con cinturón','Corte princesa','Con volumen'],
+    avoid:['Líneas rectas de arriba a abajo'],
+    tip:'Crea curvas con volumen estratégico y cinturones.'
+  },
+  inverted:{
+    tops:['Colores oscuros arriba','Escotes en V','Telas simples','Sin hombreras'],
+    bottoms:['Colores claros abajo','Faldas con vuelo','Pantalones anchos','Estampados'],
+    dresses:['Vestidos con falda voluminosa'],
+    avoid:['Hombros marcados','Mangas con volumen'],
+    tip:'Añade volumen abajo para equilibrar tus hombros.'
+  }
+};
+
+const SEASON_COLORS = {
+  primavera:['#ff6b6b','#ffa94d','#ffd93d','#69db7c','#4dabf7','#da77f2','#f8f9fa','#e9ecef','#ffc078'],
+  verano:['#e64980','#cc5de8','#7950f2','#4c6ef5','#74c0fc','#bac8ff','#d0bfff','#e599f7'],
+  otoño:['#c92a2a','#e8590c','#f08c00','#2b8a3e','#5c940d','#845ef7','#9c6644','#ae3ec9'],
+  invierno:['#e03131','#e94560','#7c4dff','#1e3a8a','#0891b2','#059669','#1a1a2e','#fff','#718096'],
+};
+
+// ─── STATE ───
+let state = {
+  items: [],
+  profile: { bodyType:'', skinTone:'', height:'', stylePref:'Casual' },
+  filter: 'all',
+  lastImg: null,
+};
+
+function loadState() {
+  // Don't auto-load global state anymore; user data is loaded on login
+  if (!state._occasion) state._occasion = 'casual';
+  if (!state.items) state.items = [];
+  if (!state.profile) state.profile = { bodyType:'', skinTone:'', height:'', stylePref:'Casual' };
+}
+function saveState() {
+  try { localStorage.setItem('wardrobe_state', JSON.stringify(state)); } catch(_) {}
+}
+
+// ─── TABS ───
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('page-'+btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'home') renderHome();
+    if (btn.dataset.tab === 'closet') renderCloset('all');
+  });
+});
+
+// ─── GREETING ───
+function setGreeting() {
+  const h = new Date().getHours();
+  let g = '¡Buenas noches!';
+  if (h < 12) g = '¡Buenos días!';
+  else if (h < 18) g = '¡Buenas tardes!';
+  document.getElementById('greeting').textContent = g;
+  const opts = { weekday:'long', day:'numeric', month:'long' };
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('es-ES', opts);
+}
+setGreeting();
+
+// ─── HOME ───
+function renderHome() {
+  const el = document.getElementById('homeContent');
+  const items = state.items;
+  const prof = state.profile;
+
+  if (items.length === 0) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="e-icon">👗</div>
+        <p>Aún no tienes prendas en tu clóset.<br>Agrega fotos para recibir recomendaciones.</p>
+      </div>
+      <button class="btn-primary" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600"
+        onclick="document.querySelector('[data-tab=add]').click()">📸 Agregar mi primera prenda</button>`;
+    return;
+  }
+
+  // Occasion selector
+  const selectedOccasion = state._occasion || 'casual';
+  let html = `<div class="card">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">📅 ¿Para qué ocasión?</div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap">`;
+  OCCASIONS.forEach(o => {
+    html += `<button onclick="selectOccasion('${o.id}')" style="padding:6px 10px;background:${selectedOccasion===o.id?'#e94560':'#f5f5f5'};color:${selectedOccasion===o.id?'#fff':'#444'};border:none;border-radius:8px;font-size:11px;cursor:pointer;transition:.1s">${o.name}</button>`;
+  });
+  html += `</div></div>`;
+
+  const outfit = generateSmartOutfit(items, prof, selectedOccasion);
+
+  html += `<div class="outfit-card">
+    <div class="big-icon">✨</div>
+    <div class="title">Outfit para ${OCCASIONS.find(o=>o.id===selectedOccasion)?.name||'hoy'}</div>
+    <div class="desc">${outfit.description}</div>
+  </div>`;
+
+  // Outfit pieces
+  if (outfit.pieces.length > 0) {
+    html += `<div style="font-size:13px;font-weight:600;margin-bottom:8px">🧥 Las piezas</div>
+    <div class="outfit-grid">`;
+    outfit.pieces.forEach(p => {
+      const item = items.find(i => i.id === p.id);
+      if (!item) return;
+      html += `<div class="outfit-item">
+        <div class="preview">${item.img ? '<img src="'+item.img+'" style="width:100%;height:100%;object-fit:cover;border-radius:8px">' : '👕'}</div>
+        <div class="name">${item.name||'Prenda'}</div>
+        <div class="reason">${p.reason||''}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Style tips based on occasion + body
+  if (prof.bodyType && BODY_RECS[prof.bodyType]) {
+    const bt = BODY_RECS[prof.bodyType];
+    html += `<div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">💡 Para tu figura (${BODY_TYPES.find(t=>t.id===prof.bodyType)?.name||''})</div>
+      <div style="font-size:12px;color:#666;line-height:1.6">${bt.tip}</div>
+      <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">${bt.tops.slice(0,3).map(t=>`<span style="padding:2px 8px;background:#f5f5f5;border-radius:10px;font-size:10px;color:#888">${t}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  // Color season palette
+  if (prof.skinTone) {
+    const st = SKIN_TONES.find(s => s.id === prof.skinTone);
+    if (st) {
+      const cols = SEASON_COLORS[st.season] || [];
+      html += `<div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:6px">🎨 Tu paleta (${st.season})</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${cols.map(c => `<span style="width:24px;height:24px;border-radius:50%;background:${c};border:1px solid #ddd"></span>`).join('')}</div>
+        <div style="font-size:11px;color:#888">${outfit.colorTip}</div>
+      </div>`;
+    }
+  }
+
+  // Vibe suggestion
+  const occRule = OCCASION_RULES[selectedOccasion];
+  if (occRule) {
+    html += `<div class="card" style="background:#faf0ff">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">🎯 Vibra sugerida</div>
+      <div style="font-size:12px;color:#666">${occRule.vibe}</div>
+      <div class="rec-tags" style="margin-top:6px">${occRule.tops.slice(0,2).map(t=>`<span>${t}</span>`).join('')}${occRule.bottoms.slice(0,2).map(t=>`<span>${t}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  // Missing categories for this occasion
+  const cats = new Set(items.map(i => i.category));
+  const needed = ['top','bottom','shoe'];
+  const missing = needed.filter(c => !cats.has(c));
+  if (missing.length > 0) {
+    const names = { top:'parte de arriba', bottom:'parte de abajo', shoe:'zapatos' };
+    html += `<div class="card" style="background:#fff8f0">
+      <div style="font-size:12px;color:#888">📋 Te hace falta: ${missing.map(m => names[m]||m).join(', ')}. ¡Agrega más prendas!</div>
+    </div>`;
+  }
+
+  // Weather note
+  const month = new Date().getMonth();
+  const season = month >= 11 || month <= 1 ? 'invierno' : month >= 2 && month <= 4 ? 'primavera' : month >= 5 && month <= 7 ? 'verano' : 'otoño';
+  html += `<div class="card" style="font-size:12px;color:#888;text-align:center">
+    🌤️ Estamos en ${season}. ${
+      season==='verano'?'Opta por telas ligeras y colores claros.':
+      season==='invierno'?'Capas y telas abrigadas son clave.':
+      'Colores de la temporada y capas medias.'
+    }
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+function selectOccasion(id) {
+  state._occasion = id;
+  saveState();
+  renderHome();
+}
+
+function generateSmartOutfit(items, prof, occasion) {
+  const tops = items.filter(i => i.category === 'top');
+  const bottoms = items.filter(i => i.category === 'bottom');
+  const dresses = items.filter(i => i.category === 'dress');
+  const shoes = items.filter(i => i.category === 'shoe');
+  const accessories = items.filter(i => i.category === 'accessory');
+  const outers = items.filter(i => i.category === 'outer');
+
+  const chosen = [];
+  const occRule = OCCASION_RULES[occasion];
+  const season = SKIN_TONES.find(s => s.id === prof.skinTone)?.season || 'primavera';
+  const seasonColors = SEASON_COLORS[season] || [];
+
+  const pickBest = (arr, cat, reason) => {
+    if (arr.length === 0) return null;
+    // Prefer items whose color matches the season palette
+    const scored = arr.map(item => {
+      let score = 0;
+      if (item.color && seasonColors.some(sc => Math.abs(parseInt(item.color.slice(1,3),16) - parseInt(sc.slice(1,3),16)) < 40)) score += 10;
+      if (prof.stylePref && item.styles?.includes(prof.stylePref)) score += 5;
+      if (item.styles?.includes(occRule?.vibe?.toLowerCase()) || item.styles?.includes(occasion)) score += 3;
+      return { item, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    const picked = scored[0].item;
+    chosen.push({ id: picked.id, reason });
+    return picked;
+  };
+
+  let desc = '';
+
+  if (occasion === 'beach' || occasion === 'sport') {
+    pickBest(tops, 'top', 'Ideal para la actividad');
+    pickBest(bottoms, 'bottom', 'Cómodo y funcional');
+  } else if (dresses.length > 0 && Math.random() > 0.3) {
+    const d = pickBest(dresses, 'dress', 'Vestido perfecto para la ocasión');
+    desc = d ? `Este ${d.name||'vestido'} es ideal. ` : '';
+  } else {
+    pickBest(tops, 'top', 'Prenda superior recomendada');
+    pickBest(bottoms, 'bottom', 'Combinación ideal');
+    if (occasion === 'formal' || occasion === 'work' || occasion === 'interview') {
+      if (outers.length > 0) pickBest(outers, 'outer', 'Capa profesional');
+    }
+  }
+
+  pickBest(shoes, 'shoe', 'Calzado que complementa');
+  if (occasion === 'formal' || occasion === 'party' || occasion === 'date') {
+    pickBest(accessories, 'accessory', 'El accesorio que realza');
+  }
+
+  // Build description
+  const bodyName = prof.bodyType ? BODY_TYPES.find(t=>t.id===prof.bodyType)?.name : '';
+  const seasonName = SKIN_TONES.find(s => s.id === prof.skinTone)?.season || '';
+
+  desc += ` Para tu figura${bodyName ? ' de '+bodyName : ''}${seasonName ? ', tus colores de '+seasonName : ''} te favorecen.`;
+
+  if (occRule) desc += ` Estilo ${occRule.vibe.toLowerCase()}.`;
+
+  // Color tip
+  let colorTip = `Los colores de ${seasonName||'tu paleta'} armonizan con tu piel.`;
+  if (occasion === 'work' || occasion === 'interview') colorTip += ' Opta por neutros y colores de autoridad.';
+  else if (occasion === 'party') colorTip += ' Atrévete con acentos vibrantes.';
+  else if (occasion === 'date') colorTip += ' Usa colores que te hagan sentir segura.';
+  else if (occasion === 'beach') colorTip += ' Claros y alegres para el sol.';
+
+  return { pieces: chosen, description: desc, colorTip };
+}
+
+// ─── OUTFIT GENERATOR ───
+
+
+// ─── CLOSET ───
+function renderCloset(filter) {
+  state.filter = filter || 'all';
+  const items = filter === 'all' ? state.items : state.items.filter(i => i.category === filter);
+  const grid = document.getElementById('closetGrid');
+
+  if (items.length === 0) {
+    grid.innerHTML = `<div class="empty"><div class="e-icon">📭</div>
+      <p>${filter === 'all' ? 'Tu clóset está vacío' : 'No hay prendas de esta categoría'}</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = items.map(item => `
+    <div class="closet-item">
+      ${item.img ? `<img src="${item.img}" alt="${item.name||'Prenda'}">` : `<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:32px;background:#f5f5f5">👕</div>`}
+      <div class="info">
+        <span class="tag">${item.name||'Prenda'}</span>
+        <span class="cat">${catName(item.category)}</span>
+      </div>
+      <button class="del-btn" onclick="deleteItem('${item.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+function filterCloset(cat) { renderCloset(cat); }
+
+function catName(c) {
+  return { top:'Top',bottom:'Bottom',dress:'Vestido',shoe:'Zapatos',accessory:'Acc',outer:'Abrigo' }[c]||c;
+}
+
+function deleteItem(id) {
+  if (!confirm('¿Eliminar esta prenda?')) return;
+  state.items = state.items.filter(i => i.id !== id);
+  saveState();
+  renderCloset(state.filter);
+}
+
+// ─── CAMERA ───
+let stream = null;
+
+function openCamera() {
+  const video = document.getElementById('video');
+  const placeholder = document.getElementById('camPlaceholder');
+  placeholder.style.display = 'none';
+  video.style.display = 'block';
+
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment', width:720, height:960 } })
+    .then(s => { stream = s; video.srcObject = s; })
+    .catch(() => {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(s => { stream = s; video.srcObject = s; })
+        .catch(() => alert('No se pudo abrir la cámara'));
+    });
+}
+
+function capture() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('photoCanvas');
+  if (!video.srcObject) { alert('Abre la cámara primero'); return; }
+  canvas.width = video.videoWidth || 720;
+  canvas.height = video.videoHeight || 960;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  state.lastImg = canvas.toDataURL('image/jpeg', 0.8);
+  const placeholder = document.getElementById('camPlaceholder');
+  placeholder.style.display = 'none';
+  placeholder.innerHTML = `<img src="${state.lastImg}" style="width:100%;height:100%;object-fit:cover">`;
+  placeholder.style.display = 'block';
+  video.style.display = 'none';
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  analyzeImage(state.lastImg);
+}
+
+function uploadFile() {
+  document.getElementById('fileInput').click();
+}
+
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    state.lastImg = e.target.result;
+    const placeholder = document.getElementById('camPlaceholder');
+    placeholder.innerHTML = `<img src="${state.lastImg}" style="width:100%;height:100%;object-fit:cover">`;
+    placeholder.style.display = 'block';
+    document.getElementById('video').style.display = 'none';
+    analyzeImage(state.lastImg);
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─── IMAGE ANALYSIS ───
+let mobilenetModel = null;
+let modelLoading = false;
+
+(async function loadModel() {
+  try {
+    modelLoading = true;
+    mobilenetModel = await mobilenet.load();
+    console.log('📷 MobileNet cargado');
+  } catch(e) {
+    console.log('MobileNet no disponible, usando clasificación por color');
+  }
+  modelLoading = false;
+})();
+
+function analyzeImage(imgData) {
+  showAnalyzing(true);
+
+  const img = new Image();
+  img.onload = () => {
+    // 1. Extract dominant color
+    const color = extractDominantColor(img);
+    if (color) {
+      document.querySelectorAll('#colorTags button').forEach(b => {
+        b.classList.toggle('active', b.dataset.color === color);
+      });
+    }
+
+    // 2. Try MobileNet classification
+    if (mobilenetModel) {
+      classifyWithMobileNet(img);
+    } else if (!modelLoading) {
+      // Fallback: heuristic classification
+      heuristicClassify(img);
+      showAnalyzing(false);
+    } else {
+      // Wait for model
+      setTimeout(() => {
+        if (mobilenetModel) classifyWithMobileNet(img);
+        else { heuristicClassify(img); showAnalyzing(false); }
+      }, 2000);
+    }
+  };
+  img.src = imgData;
+}
+
+function showAnalyzing(on) {
+  const btn = document.getElementById('captureBtn');
+  if (on) {
+    btn.textContent = '⏳ Analizando...';
+    btn.disabled = true;
+    btn.style.opacity = '.6';
+  } else {
+    btn.textContent = '📸 Tomar foto';
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+}
+
+function extractDominantColor(img) {
+  const c = document.createElement('canvas');
+  c.width = 100; c.height = 100;
+  const cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0, 100, 100);
+
+  const data = cx.getImageData(0, 0, 100, 100).data;
+  const colorCounts = {};
+
+  for (let i = 0; i < data.length; i += 16) {
+    const r = Math.round(data[i] / 32) * 32;
+    const g = Math.round(data[i + 1] / 32) * 32;
+    const b = Math.round(data[i + 2] / 32) * 32;
+    const key = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    colorCounts[key] = (colorCounts[key] || 0) + 1;
+  }
+
+  const sorted = Object.entries(colorCounts).sort((a, b) => b[1] - a[1]);
+  const dominant = sorted[0]?.[0] || '#888888';
+
+  // Map to closest preset color
+  return mapToClosestColor(dominant);
+}
+
+function mapToClosestColor(hex) {
+  const r1 = parseInt(hex.slice(1,3), 16);
+  const g1 = parseInt(hex.slice(3,5), 16);
+  const b1 = parseInt(hex.slice(5,7), 16);
+
+  let best = '#888';
+  let bestDist = Infinity;
+
+  COLORS.forEach(c => {
+    const [h] = c.split(' ');
+    const r2 = parseInt(h.slice(1,3), 16);
+    const g2 = parseInt(h.slice(3,5), 16);
+    const b2 = parseInt(h.slice(5,7), 16);
+    const dist = Math.sqrt((r1-r2)**2 + (g1-g2)**2 + (b1-b2)**2);
+    if (dist < bestDist) { bestDist = dist; best = h; }
+  });
+
+  return best;
+}
+
+async function classifyWithMobileNet(img) {
+  try {
+    const predictions = await mobilenetModel.classify(img);
+    showAnalyzing(false);
+
+    if (predictions && predictions.length > 0) {
+      const label = predictions[0].className.toLowerCase();
+      const confidence = predictions[0].probability;
+      console.log('🧠 MobileNet:', label, confidence);
+
+      const cat = mapLabelToCategory(label);
+      if (cat) {
+        document.getElementById('itemCategory').value = cat;
+        document.getElementById('itemCategory').style.borderColor = '#2ecc71';
+        setTimeout(() => document.getElementById('itemCategory').style.borderColor = '', 2000);
+      }
+    }
+  } catch(e) {
+    console.log('Error en clasificación:', e);
+    heuristicClassify(img);
+    showAnalyzing(false);
+  }
+}
+
+function heuristicClassify(img) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth || img.width;
+  c.height = img.naturalHeight || img.height;
+  const cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0);
+
+  const w = c.width, h = c.height;
+  const ratio = h / w;
+
+  // Sample colors in top vs bottom half
+  const topData = cx.getImageData(0, 0, w, Math.floor(h/2)).data;
+  const botData = cx.getImageData(0, Math.floor(h/2), w, Math.ceil(h/2)).data;
+
+  const avgColor = (data) => {
+    let r=0,g=0,b=0,count=0;
+    for (let i=0;i<data.length;i+=16){r+=data[i];g+=data[i+1];b+=data[i+2];count++;}
+    return count?{r:r/count,g:g/count,b:b/count}:{r:128,g:128,b:128};
+  };
+
+  const topAvg = avgColor(topData);
+  const botAvg = avgColor(botData);
+  const diff = Math.sqrt((topAvg.r-botAvg.r)**2 + (topAvg.g-botAvg.g)**2 + (topAvg.b-botAvg.b)**2);
+
+  let suggestion = 'top';
+  if (ratio > 1.8 && diff < 40) suggestion = 'dress';
+  else if (ratio > 1.6 && diff < 30) suggestion = 'dress';
+  else if (diff > 60) suggestion = 'top'; // two pieces likely
+  else if (ratio < 0.8) suggestion = 'accessory';
+
+  document.getElementById('itemCategory').value = suggestion;
+  document.getElementById('itemCategory').style.borderColor = '#2ecc71';
+  setTimeout(() => document.getElementById('itemCategory').style.borderColor = '', 2000);
+}
+
+function mapLabelToCategory(label) {
+  const dressKW = ['dress','gown','kimono','robe','vestment','cassock','sundress','hoopskirt','sarong'];
+  const topKW = ['brassiere','shirt','blouse','suit','tux','cardigan','sweater','jersey','hoodie','vest','polo','t-shirt','bra','bodice','corset','camisole','singlet'];
+  const bottomKW = ['jean','trouser','pant','short','skirt','culotte','chino','legging','sweatpant','miniskirt','kilt'];
+  const shoeKW = ['shoe','boot','sandal','sneaker','loafer','pump','stiletto','clog','moccasin','espadrille'];
+  const outerKW = ['coat','jacket','cloak','parka','poncho','mantle','overcoat','raincoat','windbreaker','blazer','trench'];
+  const accessoryKW = ['hat','cap','belt','scarf','tie','bag','purse','wallet','watch','ring','necklace','earring','glove','muffler','sunglass','backpack','sash','stole'];
+
+  if (dressKW.some(k => label.includes(k))) return 'dress';
+  if (bottomKW.some(k => label.includes(k))) return 'bottom';
+  if (shoeKW.some(k => label.includes(k))) return 'shoe';
+  if (outerKW.some(k => label.includes(k))) return 'outer';
+  if (accessoryKW.some(k => label.includes(k))) return 'accessory';
+  if (topKW.some(k => label.includes(k))) return 'top';
+  return null;
+}
+
+// ─── TAGS ───
+function initTags() {
+  const colorEl = document.getElementById('colorTags');
+  colorEl.innerHTML = COLORS.map(c => {
+    const [hex, name] = c.split(' ');
+    return `<button data-color="${hex}" style="border-left:3px solid ${hex}">${name}</button>`;
+  }).join('');
+  colorEl.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      colorEl.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  const styleEl = document.getElementById('styleTags');
+  styleEl.innerHTML = STYLES.map(s => `<button data-style="${s}">${s}</button>`).join('');
+  styleEl.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      b.classList.toggle('active');
+    });
+  });
+}
+initTags();
+
+// ─── SAVE ITEM ───
+function saveItem() {
+  if (!state.lastImg) { alert('Toma o sube una foto primero'); return; }
+  const cat = document.getElementById('itemCategory').value;
+  const name = document.getElementById('itemName').value.trim() || 'Prenda';
+  const colorEl = document.querySelector('#colorTags .active');
+  const color = colorEl ? colorEl.dataset.color : '#888';
+  const styles = Array.from(document.querySelectorAll('#styleTags .active')).map(b => b.dataset.style);
+
+  const item = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+    img: state.lastImg,
+    category: cat,
+    name,
+    color,
+    styles,
+    added: new Date().toISOString(),
+  };
+
+  state.items.push(item);
+  state.lastImg = null;
+  saveState();
+
+  // Reset form
+  document.getElementById('itemName').value = '';
+  document.querySelectorAll('#colorTags .active').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#styleTags .active').forEach(b => b.classList.remove('active'));
+  document.getElementById('camPlaceholder').innerHTML = `
+    <span class="cam-icon">📷</span>
+    <span style="font-size:13px">Toma una foto de tu prenda</span>`;
+
+  alert('✅ Prenda guardada');
+  document.querySelector('[data-tab="closet"]').click();
+  renderCloset('all');
+}
+
+// ─── PROFILE ───
+function initProfile() {
+  // Body type
+  const btGrid = document.getElementById('bodyTypeGrid');
+  btGrid.innerHTML = BODY_TYPES.map(b =>
+    `<button data-id="${b.id}" title="${b.desc}"><span class="opt-icon">${b.icon}</span>${b.name}</button>`
+  ).join('');
+  btGrid.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      btGrid.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // Skin tone
+  const stGrid = document.getElementById('skinToneGrid');
+  stGrid.innerHTML = SKIN_TONES.map(s =>
+    `<button data-id="${s.id}"><span class="opt-icon">${s.icon}</span>${s.name}</button>`
+  ).join('');
+  stGrid.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      stGrid.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // Height
+  const hGrid = document.getElementById('heightGrid');
+  hGrid.innerHTML = HEIGHTS.map(h =>
+    `<button data-id="${h.id}"><span class="opt-icon">${h.icon}</span>${h.name}</button>`
+  ).join('');
+  hGrid.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      hGrid.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // Style pref
+  const spGrid = document.getElementById('stylePrefGrid');
+  spGrid.innerHTML = STYLE_PREFS.map(s =>
+    `<button data-id="${s}">${s}</button>`
+  ).join('');
+  spGrid.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      spGrid.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+
+  // Load saved profile
+  if (state.profile.bodyType) {
+    btGrid.querySelector(`[data-id="${state.profile.bodyType}"]`)?.classList.add('active');
+  }
+  if (state.profile.skinTone) {
+    stGrid.querySelector(`[data-id="${state.profile.skinTone}"]`)?.classList.add('active');
+  }
+  if (state.profile.height) {
+    hGrid.querySelector(`[data-id="${state.profile.height}"]`)?.classList.add('active');
+  }
+  if (state.profile.stylePref) {
+    spGrid.querySelector(`[data-id="${state.profile.stylePref}"]`)?.classList.add('active');
+  }
+}
+initProfile();
+
+function saveProfile() {
+  const bt = document.querySelector('#bodyTypeGrid .active');
+  const st = document.querySelector('#skinToneGrid .active');
+  const ht = document.querySelector('#heightGrid .active');
+  const sp = document.querySelector('#stylePrefGrid .active');
+
+  state.profile = {
+    bodyType: bt ? bt.dataset.id : '',
+    skinTone: st ? st.dataset.id : '',
+    height: ht ? ht.dataset.id : '',
+    stylePref: sp ? sp.dataset.id : 'Casual',
+  };
+  saveState();
+  renderProfileRecs();
+  alert('✅ Perfil guardado');
+}
+
+function renderProfileRecs() {
+  const card = document.getElementById('recsCard');
+  const el = document.getElementById('profileRecs');
+  const prof = state.profile;
+
+  if (!prof.bodyType && !prof.skinTone) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+
+  let html = '';
+
+  if (prof.bodyType && BODY_RECS[prof.bodyType]) {
+    const bt = BODY_RECS[prof.bodyType];
+    html += `<div class="rec-card">
+      <div class="rec-title">👗 Para tu figura ${BODY_TYPES.find(t=>t.id===prof.bodyType)?.name||''}</div>
+      <div class="rec-desc">${bt.tip}</div>
+      <div class="rec-tags">${bt.tops.slice(0,3).map(t=>`<span>${t}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  if (prof.skinTone) {
+    const st = SKIN_TONES.find(s => s.id === prof.skinTone);
+    if (st) {
+      const cols = SEASON_COLORS[st.season] || [];
+      html += `<div class="rec-card">
+        <div class="rec-title">🎨 Tu paleta: ${st.season}</div>
+        <div class="rec-desc">Los colores que armonizan con tu piel.</div>
+        <div style="display:flex;gap:4px;margin-top:6px">${cols.map(c => `<span style="width:20px;height:20px;border-radius:50%;background:${c};border:1px solid #ddd;display:inline-block"></span>`).join('')}</div>
+      </div>`;
+    }
+  }
+
+  if (prof.height) {
+    const hRecs = {
+      short: 'Usa pantalones de cintura alta y telas verticales para estilizar. Los vestidos cortos y tacones te favorecen.',
+      medium: 'Cualquier estilo te queda bien. Prueba siluetas proporcionadas y cinturones para marcar cintura.',
+      tall: 'Los pantalones anchos, vestidos largos y capas te sientan espectacular. Aprovecha tu altura.',
+    };
+    html += `<div class="rec-card">
+      <div class="rec-title">📏 Según tu estatura</div>
+      <div class="rec-desc">${hRecs[prof.height]||'Cualquier estilo funciona.'}</div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+// ─── DISCOVER: BODY TYPE QUIZ ───
+let bodyAnswers = {};
+
+function answerBody(q, val) {
+  bodyAnswers[q] = val;
+  document.getElementById('bq'+q).style.display = 'none';
+  const next = q + 1;
+  const nextEl = document.getElementById('bq'+next);
+  if (nextEl) {
+    nextEl.style.display = 'block';
+  } else {
+    showBodyResult();
+  }
+}
+
+function showBodyResult() {
+  const result = document.getElementById('bodyResult');
+  result.style.display = 'block';
+
+  // Determine body type from answers
+  const {1:s1, 2:s2, 3:s3} = bodyAnswers;
+  let type = 'rectangle';
+
+  if (s1 === 'shoulders-equal' && s2 === 'waist-defined') type = 'hourglass';
+  else if (s1 === 'shoulders-narrow' || (s2 === 'waist-defined' && s3 === 'weight-hips')) type = 'pear';
+  else if (s2 === 'waist-fuller' || s3 === 'weight-belly') type = 'apple';
+  else if (s1 === 'shoulders-wide' && s2 !== 'waist-defined') type = 'inverted';
+  else type = 'rectangle';
+
+  const bt = BODY_TYPES.find(b => b.id === type);
+  if (!bt) return;
+  const rec = BODY_RECS[type];
+
+  document.getElementById('bodyResultIcon').textContent = bt.icon;
+  document.getElementById('bodyResultTitle').textContent = bt.name;
+  document.getElementById('bodyResultDesc').innerHTML =
+    `${bt.desc}<br><br><strong>💡 Consejo:</strong> ${rec ? rec.tip : ''}`;
+
+  state._discoveredBody = type;
+}
+
+function applyBodyResult() {
+  if (!state._discoveredBody) return;
+  const btGrid = document.getElementById('bodyTypeGrid');
+  btGrid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  const btn = btGrid.querySelector(`[data-id="${state._discoveredBody}"]`);
+  if (btn) btn.classList.add('active');
+  state.profile.bodyType = state._discoveredBody;
+  saveState();
+  renderProfileRecs();
+  alert('✅ Tipo de cuerpo guardado: ' + (BODY_TYPES.find(b=>b.id===state._discoveredBody)?.name||state._discoveredBody));
+}
+
+function resetBodyQuiz() {
+  bodyAnswers = {};
+  state._discoveredBody = null;
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('bq'+i);
+    if (el) el.style.display = i === 1 ? 'block' : 'none';
+  });
+  document.getElementById('bodyResult').style.display = 'none';
+}
+
+// ─── DISCOVER: SKIN TONE QUIZ ───
+let skinAnswers = {};
+
+function answerSkin(q, val) {
+  skinAnswers[q] = val;
+  document.getElementById('sq'+q).style.display = 'none';
+  const next = q + 1;
+  const nextEl = document.getElementById('sq'+next);
+  if (nextEl) {
+    nextEl.style.display = 'block';
+  } else {
+    showSkinResult();
+  }
+}
+
+function showSkinResult() {
+  const result = document.getElementById('skinResult');
+  result.style.display = 'block';
+
+  const {1:veins, 2:sun, 3:jewelry, 4:eyes} = skinAnswers;
+
+  let tone = 'medium-warm';
+  if ((veins === 'veins-blue' || veins === 'veins-mix') && (sun === 'sun-burn' || sun === 'sun-mix') && (jewelry === 'jewelry-silver' || jewelry === 'jewelry-both') && (eyes === 'eyes-light' || eyes === 'eyes-hazel')) {
+    tone = 'fair-cool';
+  } else if ((veins === 'veins-blue' || veins === 'veins-mix') && (sun === 'sun-burn') && (jewelry === 'jewelry-silver') && (eyes === 'eyes-light' || eyes === 'eyes-dark')) {
+    tone = 'fair-cool';
+  } else if (veins === 'veins-green' && sun === 'sun-tan' && jewelry === 'jewelry-gold' && (eyes === 'eyes-dark' || eyes === 'eyes-hazel')) {
+    tone = 'medium-warm';
+  } else if (veins === 'veins-green' && sun === 'sun-tan' && jewelry === 'jewelry-gold') {
+    tone = 'dark-warm';
+  } else if (veins === 'veins-mix' && sun === 'sun-mix' && jewelry === 'jewelry-both' && eyes === 'eyes-hazel') {
+    tone = 'olive';
+  } else if (veins === 'veins-blue' && sun === 'sun-mix' && (jewelry === 'jewelry-silver' || jewelry === 'jewelry-both')) {
+    tone = 'medium-cool';
+  } else if (veins === 'veins-green' && (sun === 'sun-tan' || sun === 'sun-mix') && jewelry === 'jewelry-gold') {
+    tone = 'dark-warm';
+  } else if (veins === 'veins-blue' && (eyes === 'eyes-light')) {
+    tone = 'fair-cool';
+  } else if (veins === 'veins-green' && (eyes === 'eyes-dark' || eyes === 'eyes-hazel')) {
+    tone = 'dark-warm';
+  } else if (veins === 'veins-mix' && jewelry === 'jewelry-both') {
+    tone = 'olive';
+  }
+
+  const st = SKIN_TONES.find(s => s.id === tone);
+  if (!st) return;
+  const cols = SEASON_COLORS[st.season] || [];
+
+  document.getElementById('skinResultIcon').textContent = st.icon;
+  document.getElementById('skinResultTitle').textContent = 'Tono ' + st.name + ' — Temporada: ' + st.season.charAt(0).toUpperCase() + st.season.slice(1);
+  document.getElementById('skinResultDesc').textContent = 'Los colores de ' + st.season + ' armonizan naturalmente con tu tono de piel.';
+  document.getElementById('skinResultPalette').innerHTML = cols.map(c =>
+    `<span style="width:24px;height:24px;border-radius:50%;background:${c};border:1px solid #ddd;display:inline-block;cursor:pointer" title="${c}"></span>`
+  ).join('');
+
+  state._discoveredSkin = tone;
+}
+
+function applySkinResult() {
+  if (!state._discoveredSkin) return;
+  const stGrid = document.getElementById('skinToneGrid');
+  stGrid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+  const btn = stGrid.querySelector(`[data-id="${state._discoveredSkin}"]`);
+  if (btn) btn.classList.add('active');
+  state.profile.skinTone = state._discoveredSkin;
+  saveState();
+  renderProfileRecs();
+  alert('✅ Tono de piel guardado: ' + (SKIN_TONES.find(s=>s.id===state._discoveredSkin)?.name||state._discoveredSkin));
+}
+
+function resetSkinQuiz() {
+  skinAnswers = {};
+  state._discoveredSkin = null;
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById('sq'+i);
+    if (el) el.style.display = i === 1 ? 'block' : 'none';
+  });
+  document.getElementById('skinResult').style.display = 'none';
+}
+
+// ─── USER SYSTEM ───
+let currentUser = null;
+const USERS_KEY = 'wardrobe_users_list';
+
+function getUsers() {
+  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch(e) { return []; }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function getUserDataKey(user) {
+  return 'wardrobe_data_' + user.replace(/[^a-zA-Z0-9_]/g, '_');
+}
+
+function loadUserData(user) {
+  const key = getUserDataKey(user);
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const data = JSON.parse(raw);
+      Object.assign(state, data);
+    }
+  } catch(e) {}
+  if (!state._occasion) state._occasion = 'casual';
+  if (!state.items) state.items = [];
+  if (!state.profile) state.profile = { bodyType:'', skinTone:'', height:'', stylePref:'Casual' };
+}
+
+function saveUserData() {
+  if (!currentUser) return;
+  const key = getUserDataKey(currentUser);
+  const toSave = { items: state.items, profile: state.profile, _occasion: state._occasion };
+  localStorage.setItem(key, JSON.stringify(toSave));
+}
+
+function renderLogin() {
+  const el = document.getElementById('loginContent');
+  const users = getUsers();
+
+  let html = '';
+  if (users.length > 0) {
+    html += `<div class="users-list">`;
+    users.forEach(u => {
+      html += `<button onclick="loginAs('${u.replace(/'/g,"\\'")}')" style="display:flex;align-items:center;justify-content:space-between">
+        <span>👤 ${u}</span>
+        <span onclick="event.stopPropagation();deleteUser('${u.replace(/'/g,"\\'")}')" style="color:#e94560;font-size:12px">✕</span>
+      </button>`;
+    });
+    html += `</div><div class="or">o</div>`;
+  } else {
+    html += `<div class="sub">Crea tu primer usuario para empezar</div>`;
+  }
+
+  html += `
+    <input id="newUserName" placeholder="Nombre de usuario" maxlength="20" onkeydown="if(event.key==='Enter')createUser()">
+    <button class="btn-login" onclick="createUser()">✨ Crear usuario</button>
+  `;
+
+  el.innerHTML = html;
+  document.getElementById('loginOverlay').style.display = 'flex';
+}
+
+function deleteUser(user) {
+  if (!confirm('¿Eliminar usuario "'+user+'" y todos sus datos?')) return;
+  const key = getUserDataKey(user);
+  localStorage.removeItem(key);
+  let users = getUsers();
+  users = users.filter(u => u !== user);
+  saveUsers(users);
+  if (currentUser === user) { currentUser = null; }
+  renderLogin();
+}
+
+function createUser() {
+  const name = document.getElementById('newUserName').value.trim();
+  if (!name || name.length < 2) { alert('Escribe un nombre de al menos 2 caracteres'); return; }
+  const users = getUsers();
+  if (users.includes(name)) { alert('Ese usuario ya existe'); return; }
+  users.push(name);
+  saveUsers(users);
+  loginAs(name);
+}
+
+function loginAs(user) {
+  currentUser = user;
+  // Reset state
+  state.items = [];
+  state.profile = { bodyType:'', skinTone:'', height:'', stylePref:'Casual' };
+  state._occasion = 'casual';
+  // Load user data
+  loadUserData(user);
+  // Update UI
+  document.getElementById('userName').textContent = user;
+  document.getElementById('userAvatar').textContent = user.charAt(0).toUpperCase();
+  document.getElementById('loginOverlay').style.display = 'none';
+  // Re-render
+  renderHome();
+  renderCloset('all');
+  renderProfileRecs();
+  layerUI();
+}
+
+function showLogin() {
+  renderLogin();
+}
+
+function logout() {
+  if (currentUser) saveUserData();
+  currentUser = null;
+  renderLogin();
+}
+
+// Override saveState to also save per-user
+const _origSaveState = saveState;
+function saveState() {
+  _origSaveState();
+  saveUserData();
+}
+
+// Expose logout for the badge
+document.getElementById('userBadge').addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (currentUser) {
+    if (confirm('¿Cerrar sesión de "'+currentUser+'"?')) {
+      saveUserData();
+      currentUser = null;
+      renderLogin();
+    }
+  }
+});
+
+// ─── SHARE ───
+let shareOriginalHTML = '';
+
+function showShare() {
+  const box = document.querySelector('#shareModal .share-box');
+  shareOriginalHTML = box.innerHTML;
+  document.getElementById('shareModal').style.display = 'flex';
+}
+
+function closeShare() {
+  document.getElementById('shareModal').style.display = 'none';
+  const box = document.querySelector('#shareModal .share-box');
+  if (shareOriginalHTML) box.innerHTML = shareOriginalHTML;
+}
+
+// Close modals on backdrop click
+document.getElementById('shareModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeShare();
+});
+document.getElementById('loginOverlay').addEventListener('click', e => {
+  if (e.target === e.currentTarget) { /* don't close login */ }
+});
+
+function toast(msg) {
+  const t = document.getElementById('shareToast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function shareNative() {
+  closeShare();
+  const url = window.location.href;
+  if (navigator.share) {
+    navigator.share({ title:'Wardrobe.ai', text:'Guarda tu clóset y recibe recomendaciones de moda', url })
+      .catch(() => {});
+  } else {
+    copyToClipboard(url);
+    toast('🔗 Enlace copiado al portapapeles');
+  }
+}
+
+function shareCopyLink() {
+  closeShare();
+  const url = window.location.href;
+  copyToClipboard(url);
+  toast('🔗 Enlace copiado al portapapeles');
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  }
+}
+
+function downloadApp() {
+  closeShare();
+  toast('📦 Preparando descarga...');
+  setTimeout(() => {
+    const html = document.documentElement.outerHTML;
+    const blob = new Blob([`<!DOCTYPE html>\n${html}`], { type:'text/html' });
+    const a = document.createElement('a');
+    a.download = 'wardrobe-ai.html';
+    a.href = URL.createObjectURL(blob);
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('✅ Archivo guardado');
+  }, 300);
+}
+
+function showQR() {
+  closeShare();
+  const url = window.location.href;
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(url);
+  setTimeout(() => {
+    const box = document.querySelector('#shareModal .share-box');
+    box.innerHTML = `
+      <h3>📷 Código QR</h3>
+      <div class="sub2">Escanea desde otro dispositivo</div>
+      <img src="${qrUrl}" style="width:180px;height:180px;margin:8px auto;border-radius:8px;display:block" alt="QR">
+      <div style="font-size:11px;color:#888;margin-bottom:8px;word-break:break-all">${url}</div>
+      <button class="share-close" onclick="closeShare()">Cerrar</button>
+    `;
+    document.getElementById('shareModal').style.display = 'flex';
+  }, 100);
+}
+
+// ─── EXPORT ───
+function exportData() {
+  const data = JSON.stringify(state, null, 2);
+  const a = document.createElement('a');
+  a.download = 'wardrobe_backup.json';
+  a.href = 'data:application/json,' + encodeURIComponent(data);
+  a.click();
+}
+
+// ─── INIT ───
+loadState();
+initProfile();
+renderLogin();
+</script>
+</body>
+</html>

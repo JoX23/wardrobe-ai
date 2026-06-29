@@ -227,8 +227,16 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
   .login-box input, .form-group select, .form-group input { background:#333; border-color:#444; color:#eee; }
 }
 
+/* ─── INSTALL FAB ─── */
+.install-fab { position:fixed; bottom:20px; right:20px; background:#e94560; color:#fff;
+  display:none; align-items:center; gap:6px; padding:10px 18px; border-radius:30px;
+  font-size:14px; font-weight:600; cursor:pointer; z-index:60;
+  box-shadow:0 4px 16px rgba(233,69,96,.4); transition:transform .15s; }
+.install-fab:active { transform:scale(.93); }
+.install-fab .ifab-icon { font-size:20px; }
 @media (max-width:480px) {
-  .page { padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+  .page { padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
+  .install-fab { bottom:16px; right:16px; padding:8px 14px; font-size:13px; }
   .share-toast { bottom:calc(30px + env(safe-area-inset-bottom)); }
 }
 </style>
@@ -266,6 +274,12 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
 
   <!-- TOAST -->
   <div class="share-toast" id="shareToast"></div>
+
+  <!-- INSTALL FLOATING BUTTON -->
+  <div class="install-fab" id="installFab" onclick="installApp()">
+    <span class="ifab-icon">📲</span>
+    <span class="ifab-text">Instalar</span>
+  </div>
 
   <!-- LOGIN OVERLAY -->
   <div class="login-overlay" id="loginOverlay">
@@ -1639,22 +1653,31 @@ renderLogin();
 
 // ─── PWA ───
 let deferredPrompt = null;
+function showInstallFab() {
+  const fab = document.getElementById('installFab');
+  if (!fab) return;
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  if (window.navigator.standalone) return;
+  fab.style.display = 'flex';
+}
+
 window.addEventListener('beforeinstallprompt', e => {
   deferredPrompt = e;
   document.getElementById('installIcon').textContent = '📲';
   document.getElementById('installText').innerHTML = 'Instalar app<small>Agrega a tu pantalla de inicio</small>';
+  showInstallFab();
 });
 
 function installApp() {
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.navigator.standalone) {
-    toast('🍎 En Safari: toca el icono 📤 abajo y elige "Agregar a pantalla de inicio"');
+    toast('🍎 En Safari: toca el icono 📤 y elige "Agregar a pantalla de inicio"');
     return;
   }
   if (deferredPrompt) {
     deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+    deferredPrompt.userChoice.then(() => { deferredPrompt = null; document.getElementById('installFab').style.display = 'none'; });
   } else {
-    toast('App ya instalada o abre menú → Instalar');
+    toast('App ya instalada');
   }
 }
 
@@ -1662,10 +1685,11 @@ function installApp() {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-// On iOS, show install instructions
+// On iOS, show FAB with instructions
 if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
   document.getElementById('installIcon').textContent = '🍎';
   document.getElementById('installText').innerHTML = 'Instalar en iOS<small>Agrega a pantalla de inicio desde Safari</small>';
+  setTimeout(showInstallFab, 1500);
 }
 </script>
 </body>

@@ -234,6 +234,22 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
   box-shadow:0 4px 16px rgba(233,69,96,.4); transition:transform .15s; }
 .install-fab:active { transform:scale(.93); }
 .install-fab .ifab-icon { font-size:20px; }
+
+/* ─── IOS GUIDE ─── */
+.ios-guide { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200;
+  display:none; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+.ios-guide-box { background:#fff; border-radius:20px; padding:28px; width:320px;
+  max-width:90vw; text-align:center; position:relative; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+.ios-guide-close { position:absolute; top:12px; right:16px; font-size:18px; color:#999;
+  cursor:pointer; background:none; border:none; padding:4px; }
+.ios-step { display:flex; align-items:center; gap:12px; text-align:left; font-size:13px;
+  color:#444; margin-bottom:12px; line-height:1.4; }
+.ios-step-num { width:24px; height:24px; background:#e94560; color:#fff; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;
+  flex-shrink:0; }
+.ios-guide-btn { margin-top:12px; padding:10px 24px; background:#e94560; color:#fff;
+  border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
+.ios-guide-btn:active { transform:scale(.97); }
 @media (max-width:480px) {
   .page { padding-bottom:calc(12px + env(safe-area-inset-bottom)); }
   .install-fab { bottom:16px; right:16px; padding:8px 14px; font-size:13px; }
@@ -274,6 +290,30 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
 
   <!-- TOAST -->
   <div class="share-toast" id="shareToast"></div>
+
+  <!-- IOS INSTALL GUIDE -->
+  <div class="ios-guide" id="iosGuide">
+    <div class="ios-guide-box">
+      <div class="ios-guide-close" onclick="closeIOSGuide()">✕</div>
+      <div style="font-size:32px;margin-bottom:8px">🍎</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:4px">Instalar en iPhone</div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px">Sigue estos pasos:</div>
+      <div class="ios-step">
+        <span class="ios-step-num">1</span>
+        <span>Toca <strong>Compartir</strong> (el icono 📤 que aparece abajo)</span>
+      </div>
+      <div class="ios-step">
+        <span class="ios-step-num">2</span>
+        <span>Desplázate hacia abajo y toca <strong>"Agregar a pantalla de inicio"</strong></span>
+      </div>
+      <div class="ios-step">
+        <span class="ios-step-num">3</span>
+        <span>Toca <strong>"Agregar"</strong> en la esquina superior derecha</span>
+      </div>
+      <div style="margin-top:16px;font-size:11px;color:#aaa">Solo Safari en iOS permite instalar apps web</div>
+      <button class="ios-guide-btn" onclick="openIOSShare()">Abrir compartir 📤</button>
+    </div>
+  </div>
 
   <!-- INSTALL FLOATING BUTTON -->
   <div class="install-fab" id="installFab" onclick="installApp()">
@@ -1670,15 +1710,7 @@ window.addEventListener('beforeinstallprompt', e => {
 
 function installApp() {
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.navigator.standalone) {
-    if (navigator.share) {
-      navigator.share({
-        title: 'Wardrobe AI',
-        text: 'Agrega esta app a tu pantalla de inicio',
-        url: window.location.href,
-      }).catch(() => {});
-    } else {
-      toast('🍎 Toca el icono 📤 en Safari y elige "Agregar a pantalla de inicio"');
-    }
+    document.getElementById('iosGuide').style.display = 'flex';
     return;
   }
   if (deferredPrompt) {
@@ -1686,6 +1718,21 @@ function installApp() {
     deferredPrompt.userChoice.then(() => { deferredPrompt = null; document.getElementById('installFab').style.display = 'none'; });
   } else {
     toast('App ya instalada');
+  }
+}
+
+function closeIOSGuide() {
+  document.getElementById('iosGuide').style.display = 'none';
+}
+
+function openIOSShare() {
+  closeIOSGuide();
+  if (navigator.share) {
+    navigator.share({
+      title: 'Wardrobe AI',
+      text: 'Agrega esta app a tu pantalla de inicio',
+      url: window.location.href,
+    }).catch(() => {});
   }
 }
 

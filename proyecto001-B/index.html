@@ -1818,6 +1818,8 @@ function installApp() {
   if (deferredPrompt) {
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then(() => { deferredPrompt = null; document.getElementById('installFab').style.display = 'none'; });
+  } else if (/Samsung/i.test(navigator.userAgent)) {
+    toast('En Samsung: abre el menú ☰ → "Agregar página a" → "Pantalla de inicio"');
   } else {
     toast('App ya instalada');
   }
@@ -1847,6 +1849,12 @@ if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
   document.getElementById('installIcon').textContent = '🍎';
   document.getElementById('installText').innerHTML = 'Instalar en iOS<small>Agrega a pantalla de inicio desde Safari</small>';
   setTimeout(showInstallFab, 1500);
+}
+// On Samsung Internet, also show FAB with instructions
+if (/Samsung/i.test(navigator.userAgent)) {
+  document.getElementById('installIcon').textContent = '📱';
+  document.getElementById('installText').innerHTML = 'Instalar<small>Samsung</small>';
+  setTimeout(showInstallFab, 2000);
 }
 </script>
 </body>

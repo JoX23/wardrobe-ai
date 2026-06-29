@@ -1690,14 +1690,7 @@ function showInstallBanner() {
 function installApp() {
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.navigator.standalone) {
     document.getElementById('installBanner').style.display = 'none';
-    if (navigator.share) {
-      navigator.share({
-        title:'Wardrobe AI',
-        text:'Agrega esta app a tu pantalla de inicio desde el menú Compartir de Safari'
-      }).catch(() => {});
-    } else {
-      toast('En iOS: abre Safari, toca el icono 📤 y selecciona "Agregar a pantalla de inicio"');
-    }
+    toast('🍎 En Safari: toca el icono 📤 abajo y elige "Agregar a pantalla de inicio"');
     return;
   }
   if (!deferredPrompt) {

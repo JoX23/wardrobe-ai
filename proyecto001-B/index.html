@@ -365,6 +365,24 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
     <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFile(this)">
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleFile(this)">
     <div id="autoStatus" style="text-align:center;font-size:13px;color:#888;margin:8px 0;min-height:20px"></div>
+    <div class="card" id="itemDetails" style="display:none">
+      <div class="form-group">
+        <label>Categoría detectada</label>
+        <select id="itemCategory">
+          <option value="top">Parte de arriba</option>
+          <option value="bottom">Parte de abajo</option>
+          <option value="dress">Vestido / Enterizo</option>
+          <option value="shoe">Zapatos</option>
+          <option value="accessory">Accesorio</option>
+          <option value="outer">Abrigo / Chaqueta</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nombre (opcional)</label>
+        <input id="itemName" placeholder="ej: Blusa azul floral" maxlength="30">
+      </div>
+      <button class="btn-primary" style="width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:600" onclick="saveItem()">💾 Guardar prenda</button>
+    </div>
   </div>
 
   <!-- PROFILE -->
@@ -902,7 +920,7 @@ function doCapture(video, canvas) {
   placeholder.style.display = 'block';
   video.style.display = 'none';
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  analyzeImage(state.lastImg, autoSaveItem);
+  analyzeImage(state.lastImg, showItemDetails);
 }
 
 function uploadFile() {
@@ -919,11 +937,16 @@ function handleFile(input) {
     placeholder.innerHTML = `<img src="${state.lastImg}" style="width:100%;height:100%;object-fit:cover">`;
     placeholder.style.display = 'block';
     document.getElementById('video').style.display = 'none';
-    analyzeImage(state.lastImg, autoSaveItem);
+    analyzeImage(state.lastImg, showItemDetails);
   };
   reader.readAsDataURL(file);
-  // Reset so same file can be selected again
   input.value = '';
+}
+
+function showItemDetails() {
+  document.getElementById('itemCategory').value = lastDetectedCategory;
+  document.getElementById('itemDetails').style.display = 'block';
+  document.getElementById('itemDetails').scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
 // ─── IMAGE ANALYSIS ───
@@ -1100,11 +1123,10 @@ function mapLabelToCategory(label) {
   return null;
 }
 
-function autoSaveItem() {
-  const cat = lastDetectedCategory;
-
-  const catNames = { top:'Top', bottom:'Pantalón/Falda', dress:'Vestido', shoe:'Zapato', accessory:'Accesorio', outer:'Abrigo' };
-  const name = catNames[cat] || 'Prenda';
+function saveItem() {
+  if (!state.lastImg) { toast('Toma una foto primero'); return; }
+  const cat = document.getElementById('itemCategory').value;
+  const name = document.getElementById('itemName').value.trim() || catName(cat);
 
   const item = {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2,5),
@@ -1124,6 +1146,8 @@ function autoSaveItem() {
     <span class="cam-icon">📷</span>
     <span style="font-size:13px">Toma una foto de tu prenda</span>`;
   document.getElementById('autoStatus').textContent = '';
+  document.getElementById('itemName').value = '';
+  document.getElementById('itemDetails').style.display = 'none';
 
   toast('✅ ' + name + ' guardada');
   document.querySelector('[data-tab="closet"]').click();

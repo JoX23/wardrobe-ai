@@ -13,6 +13,12 @@
 <meta name="twitter:title" content="Wardrobe AI — Tu clóset inteligente">
 <meta name="twitter:description" content="Organiza tu ropa, descubre qué te favorece y recibe outfits para cada ocasión.">
 <link rel="canonical" href="https://jox23.github.io/wardrobe-ai/proyecto001-B/">
+<meta name="theme-color" content="#e94560">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Wardrobe">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2"></script>
 <style>
@@ -216,6 +222,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
       <div class="share-option" onclick="showQR()">
         <div class="so-icon">📷</div>
         <div class="so-text">Código QR<small>Escanea desde otro dispositivo</small></div>
+      </div>
+      <div class="share-option" id="installOption" onclick="installApp()" style="display:none">
+        <div class="so-icon">📲</div>
+        <div class="so-text">Instalar app<small>Agrega a tu pantalla de inicio</small></div>
       </div>
       <button class="share-close" onclick="closeShare()">Cerrar</button>
     </div>
@@ -818,7 +828,21 @@ function openCamera() {
 function capture() {
   const video = document.getElementById('video');
   const canvas = document.getElementById('photoCanvas');
-  if (!video.srcObject) { alert('Abre la cámara primero'); return; }
+  if (!video.srcObject) {
+    openCamera();
+    const check = setInterval(() => {
+      if (video.srcObject && video.readyState >= 2) {
+        clearInterval(check);
+        doCapture(video, canvas);
+      }
+    }, 200);
+    setTimeout(() => clearInterval(check), 8000);
+    return;
+  }
+  doCapture(video, canvas);
+}
+
+function doCapture(video, canvas) {
   canvas.width = video.videoWidth || 720;
   canvas.height = video.videoHeight || 960;
   const ctx = canvas.getContext('2d');
@@ -1604,6 +1628,28 @@ function exportData() {
 loadState();
 initProfile();
 renderLogin();
+
+// ─── PWA ───
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const btn = document.getElementById('installOption');
+  if (btn) btn.style.display = 'flex';
+});
+function installApp() {
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !window.navigator.standalone) {
+    alert('En iOS: abre el menú Compartir (icono 📤) y selecciona "Agregar a la pantalla de inicio"');
+    return;
+  }
+  if (!deferredPrompt) { alert('Abre esta página en Chrome y busca "Instalar app" en el menú'); return; }
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+}
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>

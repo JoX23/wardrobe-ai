@@ -1,0 +1,15 @@
+{
+  "name": "Wardrobe AI",
+  "short_name": "Wardrobe",
+  "description": "Organiza tu clóset, descubre tu tipo de cuerpo y recibe outfits para cada ocasión",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8f6f4",
+  "theme_color": "#e94560",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

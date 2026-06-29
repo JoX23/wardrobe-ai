@@ -854,7 +854,7 @@ function doCapture(video, canvas) {
   placeholder.style.display = 'block';
   video.style.display = 'none';
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  analyzeImage(state.lastImg);
+  analyzeImage(state.lastImg, autoSaveItem);
 }
 
 function uploadFile() {
@@ -891,7 +891,7 @@ let modelLoading = false;
   modelLoading = false;
 })();
 
-function analyzeImage(imgData) {
+function analyzeImage(imgData, onDone) {
   showAnalyzing(true);
 
   const img = new Image();
@@ -906,16 +906,16 @@ function analyzeImage(imgData) {
 
     // 2. Try MobileNet classification
     if (mobilenetModel) {
-      classifyWithMobileNet(img);
+      classifyWithMobileNet(img, () => { showAnalyzing(false); if (onDone) onDone(); });
     } else if (!modelLoading) {
-      // Fallback: heuristic classification
       heuristicClassify(img);
       showAnalyzing(false);
+      if (onDone) onDone();
     } else {
       // Wait for model
       setTimeout(() => {
-        if (mobilenetModel) classifyWithMobileNet(img);
-        else { heuristicClassify(img); showAnalyzing(false); }
+        if (mobilenetModel) classifyWithMobileNet(img, () => { showAnalyzing(false); if (onDone) onDone(); });
+        else { heuristicClassify(img); showAnalyzing(false); if (onDone) onDone(); }
       }, 2000);
     }
   };
@@ -979,7 +979,7 @@ function mapToClosestColor(hex) {
   return best;
 }
 
-async function classifyWithMobileNet(img) {
+async function classifyWithMobileNet(img, onDone) {
   try {
     const predictions = await mobilenetModel.classify(img);
     showAnalyzing(false);
@@ -996,10 +996,12 @@ async function classifyWithMobileNet(img) {
         setTimeout(() => document.getElementById('itemCategory').style.borderColor = '', 2000);
       }
     }
+    if (onDone) onDone();
   } catch(e) {
     console.log('Error en clasificación:', e);
     heuristicClassify(img);
     showAnalyzing(false);
+    if (onDone) onDone();
   }
 }
 
@@ -1111,6 +1113,41 @@ function saveItem() {
     <span style="font-size:13px">Toma una foto de tu prenda</span>`;
 
   alert('✅ Prenda guardada');
+  document.querySelector('[data-tab="closet"]').click();
+  renderCloset('all');
+}
+
+function autoSaveItem() {
+  const cat = document.getElementById('itemCategory').value;
+  const colorEl = document.querySelector('#colorTags .active');
+  const color = colorEl ? colorEl.dataset.color : '#888';
+
+  const catNames = { top:'Top', bottom:'Pantalón/Falda', dress:'Vestido', shoe:'Zapato', accessory:'Accesorio', outer:'Abrigo' };
+  const name = catNames[cat] || 'Prenda';
+
+  const item = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+    img: state.lastImg,
+    category: cat,
+    name,
+    color,
+    styles: [],
+    added: new Date().toISOString(),
+  };
+
+  state.items.push(item);
+  state.lastImg = null;
+  saveState();
+
+  // Reset form
+  document.getElementById('itemName').value = '';
+  document.querySelectorAll('#colorTags .active').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#styleTags .active').forEach(b => b.classList.remove('active'));
+  document.getElementById('camPlaceholder').innerHTML = `
+    <span class="cam-icon">📷</span>
+    <span style="font-size:13px">Toma una foto de tu prenda</span>`;
+
+  toast('✅ ' + name + ' guardada');
   document.querySelector('[data-tab="closet"]').click();
   renderCloset('all');
 }

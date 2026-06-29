@@ -1640,13 +1640,9 @@ renderLogin();
 // ─── PWA ───
 let deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
   deferredPrompt = e;
   document.getElementById('installIcon').textContent = '📲';
   document.getElementById('installText').innerHTML = 'Instalar app<small>Agrega a tu pantalla de inicio</small>';
-  // Auto-show the install prompt immediately
-  deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
 });
 
 function installApp() {
@@ -1658,7 +1654,7 @@ function installApp() {
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
   } else {
-    toast('App ya instalada o no disponible');
+    toast('App ya instalada o abre menú → Instalar');
   }
 }
 
